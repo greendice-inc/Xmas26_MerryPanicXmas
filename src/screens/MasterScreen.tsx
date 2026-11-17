@@ -1,8 +1,11 @@
 import ConnDot from '../components/ConnDot'
 import Header from '../components/Header'
 import HoldButton from '../components/HoldButton'
-import { KEYBOX_COUNT, ROOM_BY_TEAM, TEAM_COUNT } from '../config'
+import { KEYBOX_ADDR, KEYBOX_COUNT, ROOM_BY_TEAM, TEAM_COUNT } from '../config'
+import { toHex2 } from '../keybox/protocol'
+import { useKeyboxLink } from '../keybox/useKeyboxLink'
 import { getBackend } from '../net'
+import { requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll } from '../net/keybox'
 import { DEFAULT_TEAM, progressLabel } from '../types'
 import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
 
@@ -10,6 +13,8 @@ export default function MasterScreen() {
   const all = usePresenceAll()
   const teams = useTeamsAll()
   const now = useNow()
+  const keyboxes = useKeyboxAll()
+  const link = useKeyboxLink(keyboxes)
   const row = (key: string, label: string, extra?: React.ReactNode) => (
     <div className="conn-item" key={key}>
       <ConnDot on={isOnline(all[key], now)} />
@@ -51,6 +56,8 @@ export default function MasterScreen() {
         title="マスター"
         right={<HoldButton onComplete={resetAll} doneLabel="リセットが完了しました">すべての端末をリセット（長押し）</HoldButton>}
       />
+      <div className="master-cols">
+      <div className="master-left">
       <section className="card">
         <h2 className="section-title">スタッフ</h2>
         <div className="conn-grid">{row('staff', 'スタッフ')}</div>
@@ -61,12 +68,45 @@ export default function MasterScreen() {
           {Array.from({ length: TEAM_COUNT }, (_, i) => teamRow(i + 1))}
         </div>
       </section>
-      <section className="card">
-        <h2 className="section-title">キーボックス</h2>
+      </div>
+      <section className="card keybox-card">
+        <div className="keybox-head">
+          <h2 className="section-title">キーボックス</h2>
+          <span className="keybox-link">
+            <ConnDot on={link.connected} />
+            USBアンテナ {link.connected ? '接続中' : '未接続'}
+          </span>
+          {link.connected ? (
+            <button className="sub" onClick={link.disconnect}>切断</button>
+          ) : (
+            <button disabled={!link.supported} onClick={link.connect}>アンテナに接続</button>
+          )}
+          {!link.supported && <span className="warn">このブラウザは Web Serial に未対応です（Chrome / Edge を使用）</span>}
+        </div>
         <div className="conn-grid">
-          {Array.from({ length: KEYBOX_COUNT }, (_, i) => row(`keybox-${i + 1}`, `キーボックス ${i + 1}`))}
+          {Array.from({ length: KEYBOX_COUNT }, (_, i) => {
+            const id = i + 1
+            const addr = KEYBOX_ADDR[id]
+            const ringing = !!keyboxes[String(id)]?.ringing
+            return (
+              <div className="conn-item keybox-item" key={id}>
+                <span className="keybox-name">キーボックス {id}</span>
+                <small>ad 0x{addr !== undefined ? toHex2(addr) : '--'}</small>
+                <span className="keybox-input">{(addr !== undefined && link.inputs[addr]) || '－'}</span>
+                <button
+                  className={`keybox-ring${ringing ? ' is-on' : ' sub'}`}
+                  onClick={() => setKeyboxRinging(id, !ringing)}
+                >
+                  {ringing ? '音を止める' : '音を鳴らす'}
+                </button>
+                <button className="keybox-ring" onClick={() => requestKeyboxUnlock(id)}>開ける</button>
+                <button className="keybox-ring sub" onClick={() => requestKeyboxLock(id)}>施錠する</button>
+              </div>
+            )
+          })}
         </div>
       </section>
+      </div>
     </div>
   )
 }

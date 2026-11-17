@@ -143,7 +143,7 @@ button.catalog-link { flex: none; font-size: 32px; padding: 16px 40px; }
 
 /* ---------- マスター ---------- */
 .master, .staff, .keybox { display: flex; flex-direction: column; gap: 26px; }
-.staff { padding-bottom: 110px; }
+.staff { padding-bottom: 200px; }
 .conn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .conn-item { display: flex; align-items: center; font-size: 38px; background: var(--panel); border-radius: 20px; padding: 22px 28px; }
 
@@ -191,7 +191,7 @@ button.order-ready { margin: 0; width: 156px; font-size: 24px; padding: 6px 0; b
 .stay-count.is-held { color: var(--red); }
 .status-bar {
   position: absolute; left: 0; right: 0; bottom: 0; height: 80px; background: #fff; border-top: 3px solid var(--line);
-  display: flex; align-items: center; gap: 60px; padding: 0 70px; font-size: 28px; color: var(--ink-sub);
+  display: flex; align-items: center; gap: 60px; padding: 0 70px; font-size: 28px; color: var(--ink-sub); white-space: nowrap;
 }
 .status-bar .dot { width: 22px; height: 22px; margin-right: 8px; }
 
@@ -203,6 +203,46 @@ button.order-ready { margin: 0; width: 156px; font-size: 24px; padding: 6px 0; b
   font-size: 28px; font-weight: 500; line-height: 1.5;
   box-shadow: var(--shadow-card);
 }
+/* マスター：USBアンテナでキーボックスとやり取りする */
+/* マスター：左にスタッフとプレイヤー、右にキーボックス。1画面に収める */
+.master-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 26px; }
+.master-left { min-height: 0; display: flex; flex-direction: column; gap: 26px; }
+.master-left .conn-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.master .conn-item { font-size: 32px; padding: 12px 24px; }
+.master .keybox-card { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; }
+.master .keybox-card .conn-grid { grid-template-columns: 1fr; }
+.master-cols .keybox-card { flex: none; align-self: start; }
+.keybox-head { flex-wrap: wrap; }
+.keybox-head { display: flex; align-items: center; gap: 28px; }
+.keybox-head .section-title { margin: 0; }
+.keybox-head button { font-size: 28px; padding: 12px 36px; }
+.keybox-link { display: flex; align-items: center; font-size: 30px; font-weight: 900; }
+.master .keybox-item { gap: 12px; font-size: 30px; padding: 12px 20px; white-space: nowrap; }
+.master .keybox-item button.keybox-ring { font-size: 22px; padding: 8px 16px; }
+.keybox-item small { font-size: 22px; color: var(--ink-sub); }
+.keybox-input { margin-left: auto; margin-right: 8px; font-family: ui-monospace, monospace; font-size: 40px; font-weight: 900; letter-spacing: .2em; }
+button.keybox-ring { font-size: 24px; padding: 8px 22px; border-radius: 12px; }
+button.keybox-ring.is-on { animation: guide-glow .7s ease-in-out infinite alternate; }
+.keybox-tools { display: flex; align-items: center; gap: 16px; white-space: nowrap; font-size: 24px; color: var(--ink-sub); }
+.keybox-tools input { font-size: 24px; padding: 8px 14px; width: 200px; min-width: 0; font-family: ui-monospace, monospace; }
+.keybox-tools button { font-size: 24px; padding: 8px 24px; }
+.keybox-log { flex: 1; min-height: 0; font-size: 20px; padding: 18px 24px; }
+.keybox-log .log-tx { color: #6cf; }
+.keybox-log .log-rx { color: #9f9; }
+.keybox-log .log-ack { color: #888; }
+.keybox-log .log-err { color: #f88; }
+.keybox-log .log-info { color: #fc6; }
+/* スタッフ：下のバーで、選んだキーボックスを操作する */
+.keybox-bar {
+  position: absolute; left: 0; right: 0; bottom: 83px; height: 90px; background: #fff; border-top: 3px solid var(--line);
+  display: flex; align-items: center; gap: 24px; padding: 0 70px; white-space: nowrap;
+}
+.keybox-bar-title { display: flex; align-items: center; gap: 8px; font-size: 30px; font-weight: 900; margin-right: 12px; }
+.keybox-bar .dot { width: 22px; height: 22px; }
+.keybox-pick { display: flex; gap: 0; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 4px #cfcfd4; }
+button.keybox-tab { margin: 0; border-radius: 0; box-shadow: none; background: #fff; color: var(--ink-sub); font-size: 30px; padding: 12px 36px; }
+button.keybox-tab.is-on { background: var(--charcoal); color: #fff; }
+.keybox-bar button.keybox-ring, .keybox-bar button.keybox-act { margin: 0; font-size: 30px; padding: 14px 40px; border-radius: 14px; }
 .warn { margin: 0; align-self: flex-start; background: #f6e3e6; color: var(--red); border-radius: 20px; padding: 14px 28px; font-size: 30px; }
 
 /* ---------- プレイヤー ---------- */
@@ -296,20 +336,12 @@ button.order-ready { margin: 0; width: 156px; font-size: 24px; padding: 6px 0; b
 
 /* ---------- ゲーム ---------- */
 .player { padding: 0; background: var(--bg); }
-/* 会話・ゲーム画面の枠 */
-.play-frame {
-  position: absolute; left: 40px; right: 40px; top: 40px; bottom: 200px; overflow: hidden;
-  border: 10px solid var(--charcoal); border-radius: 36px; background: #fff;
-  box-shadow: 0 0 0 4px #fff, 0 12px 32px rgba(0, 0, 0, 0.25);
-}
-/* 会話中・ステージ1：外側の枠なし。背景は画面いっぱいに広げる */
-.play-frame.is-open {
-  inset: 0; overflow: visible;
-  border: 0; border-radius: 0; background: transparent; box-shadow: none;
-}
+/* 会話・ゲーム画面。枠はなく、背景画像を画面全体に出す */
+/* 右下のボタンは、メニュー右端の「記録」ボタンの中央の上に並べる（右端からの距離） */
+.play-area { position: absolute; inset: 0; overflow: visible; --rec-c: calc(40px + (1840px - 56px) / 6); }
 /* 枠があったときの見た目の位置を保ったまま、背景だけ端まで出す */
-.play-frame.is-open .novel-panel { left: 90px; right: 90px; bottom: 236px; }
-.play-frame.is-open .novel-char { bottom: 490px; }
+.play-area .novel-panel { left: 90px; right: 90px; bottom: 236px; }
+.play-area .novel-char { bottom: 490px; }
 .game-menu { position: absolute; left: 40px; right: 40px; bottom: 40px; height: 120px; z-index: 6; display: flex; gap: 28px; }
 .game-menu.is-locked { pointer-events: none; }
 .game-menu button { flex: 1; font-size: 44px; padding: 0; }
@@ -469,7 +501,7 @@ button.sz-close {
 }
 button.sz-close:active { transform: none; box-shadow: none; }
 button.sock-btn {
-  position: absolute; right: 32px; bottom: 176px; z-index: 45;
+  position: absolute; right: var(--rec-c); bottom: 176px; transform: translateX(50%); z-index: 45;
   display: flex; flex-direction: row; align-items: center; gap: 14px;
   width: auto; height: auto; padding: 12px 28px 12px 16px;
   font-size: 26px; font-weight: 900; color: var(--ink);
@@ -477,9 +509,10 @@ button.sock-btn {
 }
 button.sock-btn span { padding: 0; color: inherit; background: none; box-shadow: none; }
 button.sock-btn:active { box-shadow: 0 0 0 #d7d7dc; }
-button.sock-btn.is-shifted { right: 240px; }
+/* ハートと並ぶときは、ハートの上に重ねる */
+button.sock-btn.is-shifted { bottom: 390px; }
 button.mood-heart {
-  position: absolute; right: 36px; bottom: 210px; z-index: 4;
+  position: absolute; right: calc(var(--rec-c) - 84px); bottom: 210px; z-index: 4;
   width: 168px; height: 156px; padding: 0;
   background: transparent; box-shadow: none; border-radius: 0;
 }
@@ -822,9 +855,9 @@ button.hide-area.is-debug span {
 }
 @keyframes found-ring { from { transform: scale(.2); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 @keyframes found-pop { from { transform: translate(-50%, -50%) scale(.2) rotate(-10deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1) rotate(-4deg); opacity: 1; } }
-.hide-seek .mood-heart.hide-heart { right: 16px; bottom: 10px; }
+.hide-seek .mood-heart.hide-heart { bottom: 210px; }
 button.hide-kid-icon {
-  position: absolute; right: 200px; bottom: 18px; z-index: 4; width: 150px; height: 150px; padding: 0;
+  position: absolute; right: calc(var(--rec-c) - 75px); bottom: 390px; z-index: 4; width: 150px; height: 150px; padding: 0;
   background: #fff; border-radius: 50%; overflow: hidden;
   box-shadow: inset 0 0 0 6px var(--charcoal), 0 6px 0 var(--charcoal);
   animation: pop-in .4s cubic-bezier(.2, 1.4, .4, 1) both;
@@ -1069,7 +1102,7 @@ button.hide-edit-btn {
 .word-theme b { font-family: 'Line', sans-serif; font-size: 80px; color: var(--red); }
 .word-room > .word-head:has(.word-theme) { flex-direction: column; gap: 10px; min-height: 0; margin-bottom: 16px; }
 .word-room > .word-head .word-sub { margin: 0; }
-.word-game .mood-heart.word-heart { right: 16px; bottom: 10px; }
+.word-game .mood-heart.word-heart { bottom: 210px; }
 .word-clear { position: absolute; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: rgba(15, 17, 17, .45); pointer-events: none; animation: fade-in .25s ease both; }
 .word-clear-ring { position: absolute; left: 50%; top: 50%; width: 700px; height: 700px; margin: -350px 0 0 -350px; border-radius: 50%; border: 18px solid #ffd400; animation: found-ring 1.2s ease-out both; }
 .word-clear-ring.is-late { animation-delay: .35s; border-color: #fff; }

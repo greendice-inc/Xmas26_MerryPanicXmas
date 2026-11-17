@@ -16,6 +16,10 @@ service cloud.firestore {
     match /config/{id} {
       allow read, write: if true;
     }
+    // キーボックスへの指令（マスターがUSBアンテナで送る）
+    match /keybox/{id} {
+      allow read, write: if true;
+    }
     // セリフ編集（キャラの立ち絵・場面のセリフ・効果音と音声）
     match /script/{id} {
       allow read, write: if true;

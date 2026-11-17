@@ -239,7 +239,7 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
         <div className="script-preview">
           <Stage>
             <div className="screen player">
-              <div className="play-frame is-open">
+              <div className="play-area">
                 <NovelPart scene={preview} onFinish={() => setPreview(null)} />
               </div>
             </div>

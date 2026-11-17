@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import ConnDot from '../components/ConnDot'
 import Header from '../components/Header'
 import TwoTapButton from '../components/TwoTapButton'
-import { TEAM_COUNT } from '../config'
+import { KEYBOX_COUNT, TEAM_COUNT } from '../config'
 import { getBackend } from '../net'
 import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
+import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll } from '../net/keybox'
 import { isGame1LoseCart } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { DEFAULT_TEAM, progressLabel } from '../types'
@@ -29,6 +30,10 @@ export default function StaffScreen() {
   const { products } = useProducts()
   const teams = useTeamsAll()
   const presence = usePresenceAll()
+  const keyboxes = useKeyboxAll()
+  // 下のバーで操作するキーボックス（1か2を切り替える）
+  const [boxId, setBoxId] = useState(1)
+  const boxRinging = !!keyboxes[String(boxId)]?.ringing
   const now = useNow()
   const [online, setOnline] = useState(navigator.onLine)
   useEffect(() => {
@@ -134,6 +139,24 @@ export default function StaffScreen() {
             </div>
           )
         })}
+      </div>
+      <div className="keybox-bar">
+        <span className="keybox-bar-title"><ConnDot on={!!keyboxes[LINK_ID]?.connected && isOnline(presence['master'], now)} /> キーボックス</span>
+        <div className="keybox-pick">
+          {Array.from({ length: KEYBOX_COUNT }, (_, i) => {
+            const id = i + 1
+            return (
+              <button key={id} className={`keybox-tab${id === boxId ? ' is-on' : ''}`} onClick={() => setBoxId(id)}>
+                {id}{keyboxes[String(id)]?.ringing ? ' ♪' : ''}
+              </button>
+            )
+          })}
+        </div>
+        <button className={`keybox-ring${boxRinging ? ' is-on' : ' sub'}`} onClick={() => setKeyboxRinging(boxId, !boxRinging)}>
+          {boxRinging ? '音を止める' : '音を鳴らす'}
+        </button>
+        <button className="keybox-act" onClick={() => requestKeyboxUnlock(boxId)}>開ける</button>
+        <button className="keybox-act sub" onClick={() => requestKeyboxLock(boxId)}>施錠する</button>
       </div>
       <div className="status-bar">
         <span><ConnDot on={online} /> ネットワーク: {online ? 'オンライン' : 'オフライン'}</span>

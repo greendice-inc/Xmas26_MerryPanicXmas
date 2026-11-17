@@ -338,11 +338,9 @@ export default function PlayerScreen({ team }: { team: number }) {
     body = <NovelPart key="end" scene={edited ?? ENDING} onFinish={() => {}} />
   }
 
-  // 会話・ゲーム画面は枠で囲み、下にメニューボタンを並べる
-  // 会話中とステージ1の子供部屋は外側の枠を外し、背景を画面いっぱいに広げる
+  // 会話・ゲーム画面は枠なしで、背景画像を画面全体に出す。下にメニューボタンを並べる
   const framed = loaded && entered
   const talking = doc.phase === 'novel' || doc.phase === 'clear' || doc.phase === 'end'
-  const openFrame = framed && (talking || (doc.phase === 'game' && doc.stage === 1))
   // マークの得点当てでは、まだ注文できない
   // ステージ3は、押さえてワードを2つ終えて部屋のお題が出てから
   const markQuiz =
@@ -362,7 +360,7 @@ export default function PlayerScreen({ team }: { team: number }) {
     <div className="screen player">
       {framed ? (
         <>
-          <div className={`play-frame${openFrame ? ' is-open' : ''}`}>
+          <div className="play-area">
             {body}
             {!talking && shopOpen && (
               <Santazon

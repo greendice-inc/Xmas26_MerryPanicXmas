@@ -9,6 +9,7 @@ import { ProductsProvider, useProducts } from './santazon/useProducts'
 import CatalogScreen from './screens/CatalogScreen'
 import ScriptScreen from './screens/ScriptScreen'
 import KeyboxScreen from './screens/KeyboxScreen'
+import KeyboxTestScreen from './screens/KeyboxTestScreen'
 import MasterScreen from './screens/MasterScreen'
 import PlayerScreen from './screens/PlayerScreen'
 import StaffScreen from './screens/StaffScreen'
@@ -21,14 +22,14 @@ function isDebug(): boolean {
   return new URLSearchParams(location.search).get('debug') === 'true'
 }
 
-type Page = 'catalog' | 'script'
+type Page = 'catalog' | 'script' | 'keybox'
 
-/** ?debug=true のときだけ開く画面（商品登録・セリフ編集） */
+/** ?debug=true のときだけ開く画面（商品登録・セリフ編集・キーボックスのテスト） */
 function debugPage(): Page | null {
   if (!isDebug()) return null
   const path = location.pathname.replace(/\/+$/, '')
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '')
-  for (const p of ['catalog', 'script'] as const) if (path === `${base}/${p}` || location.hash === `#${p}`) return p
+  for (const p of ['catalog', 'script', 'keybox'] as const) if (path === `${base}/${p}` || location.hash === `#${p}`) return p
   return null
 }
 
@@ -149,7 +150,7 @@ export default function App() {
 
   return (
     <ProductsProvider>
-    {page === 'catalog' ? <CatalogScreen onBack={closePage} /> : page === 'script' ? <ScriptScreen onBack={closePage} /> : (
+    {page === 'catalog' ? <CatalogScreen onBack={closePage} /> : page === 'script' ? <ScriptScreen onBack={closePage} /> : page === 'keybox' ? <Stage><KeyboxTestScreen onBack={closePage} /></Stage> : (
     <Stage>
       {identity ? (
         <>
@@ -169,6 +170,7 @@ export default function App() {
           onSelect={select}
           onOpenCatalog={isDebug() ? () => openPage('catalog') : undefined}
           onOpenScript={isDebug() ? () => openPage('script') : undefined}
+          onOpenKeybox={isDebug() ? () => openPage('keybox') : undefined}
         />
       )}
     </Stage>

@@ -6,11 +6,14 @@ export default function TopScreen({
   onSelect,
   onOpenCatalog,
   onOpenScript,
+  onOpenKeybox,
 }: {
   onSelect: (i: Identity) => void
   onOpenCatalog?: () => void
   /** セリフ編集（?debug=true のときだけ） */
   onOpenScript?: () => void
+  /** キーボックスのテスト（?debug=true のときだけ） */
+  onOpenKeybox?: () => void
 }) {
   // すでに別の端末で起動している役割には「起動中」の目印を出す
   const presence = usePresenceAll()
@@ -35,6 +38,7 @@ export default function TopScreen({
           <div className="top-updated">更新 {__UPDATED_AT__}</div>
         </div>
         <div className="top-debug-links">
+          {onOpenKeybox && <button className="catalog-link script-link" onClick={onOpenKeybox}>キーボックステスト</button>}
           {onOpenScript && <button className="catalog-link script-link" onClick={onOpenScript}>セリフ編集</button>}
           {onOpenCatalog && <button className="catalog-link" onClick={onOpenCatalog}>商品を登録</button>}
         </div>
