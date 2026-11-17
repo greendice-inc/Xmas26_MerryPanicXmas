@@ -4,23 +4,28 @@ import GameMenu from '../components/GameMenu'
 import KidsRoom from '../components/KidsRoom'
 import Logo from '../components/Logo'
 import NovelPart from '../components/NovelPart'
-import ProblemDialog from '../components/ProblemDialog'
-import Santazon, { type SzGuide, type SzTab } from '../components/Santazon'
+import ProblemDialog, { ArrivalNotice } from '../components/ProblemDialog'
+import { GuideTalk, RULES_AFTER_MARK, SOCK_TUTORIAL, type GuideLine } from '../games/Stage1Guide'
+import Santazon, { type RequestResult, type SzGuide, type SzTab } from '../components/Santazon'
+import BingoGame from '../games/BingoGame'
+import { isBingoCart, ROUNDS, roundOf } from '../games/bingoData'
 import HideSeek from '../games/HideSeek'
+import LastGame, { LastEnding } from '../games/LastGame'
+import { isLastCart, LAST_PROBLEMS, LAST_REQUEST_CODE } from '../games/lastData'
 import WordGame from '../games/WordGame'
-import { GAME_COUNT, KV_IMAGE, ROOM_BY_TEAM } from '../config'
+import { GAME_COUNT, KV_IMAGE, LAST_STAGE, ROOM_BY_TEAM } from '../config'
 import { GAMES } from '../games'
 import { useTeam } from '../net/hooks'
 import { isCorrectCart, isGame1LoseCart, ORDER_STAGES, PROBLEMS } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { useScriptScene } from '../script/scriptData'
-import { CLEAR, ENDING, NOVEL, RECORDS, characterImage } from '../scenario'
+import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_MOOD, ST1_MOOD_AFTER, ST2_MOOD, ST3_MOOD, ST4_MOOD, type Mood } from '../scenario'
 import { adultWaitMs, setAdultSkip } from '../adultWait'
-import { DEFAULT_WORD, type OrderItem } from '../types'
+import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../types'
 
 /** 正しい3点を注文してから、届いたポップアップが出るまで */
 const DELIVER_MS = 3000
-const STAGE1_TASK = '失格にならないように、1点を下回って勝負に負ける。'
+const STAGE1_TASK = 'リンさんを勝たせる。ただし「失格」になってはいけない。'
 
 /** 暗転からのフェードインの長さ（styles.css の .fade-black と合わせる） */
 const FADE_MS = 2500
@@ -30,6 +35,8 @@ const BLACKOUT_MS = 600
 const HIDE_STAGE = 2
 /** 押さえてワードのステージ */
 const WORD_STAGE = 3
+/** ビンゴのステージ */
+const BINGO_STAGE = 4
 
 const hideImg = (e: React.SyntheticEvent<HTMLImageElement>) => {
   e.currentTarget.style.display = 'none'
@@ -82,7 +89,8 @@ export default function PlayerScreen({ team }: { team: number }) {
       setCart([])
       setLocalProceedAt(null)
       setTaskOpen(false)
-      setClosedDeliveryAt(null)
+      setArrivedSeenAt(null)
+      setProblemOpen(false)
       setRecordsOpen(false)
       setClearNext(null)
       setChair(false)
@@ -127,7 +135,11 @@ export default function PlayerScreen({ team }: { team: number }) {
     return () => clearTimeout(t)
   }, [blackout])
   const [taskOpen, setTaskOpen] = useState(false)
-  const [closedDeliveryAt, setClosedDeliveryAt] = useState<number | null>(null)
+  // 「アイテムが届きました」を閉じた注文（の時刻）と、ソックスキーのナゾを開いているか
+  const [arrivedSeenAt, setArrivedSeenAt] = useState<number | null>(null)
+  const [problemOpen, setProblemOpen] = useState(false)
+  // ステージ1の案内で、プレイヤーの操作を待っているもの
+  const [guideWait, setGuideWait] = useState<GuideLine['wait'] | null>(null)
   // 正解直後、Firestore の反映を待たずにエルフを出すための時刻
   const [localProceedAt, setLocalProceedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -139,9 +151,42 @@ export default function PlayerScreen({ team }: { team: number }) {
   const updateRef = useRef(update)
   updateRef.current = update
 
+  /** そのステージの正しい注文か（ビンゴはラウンドごとに違う） */
+  const correctCart = (items: OrderItem[]) =>
+    doc.stage === BINGO_STAGE
+      ? isBingoCart(doc.bingo?.step, items, products)
+      : doc.stage === LAST_STAGE
+        ? isLastCart(doc.last?.step, items, products)
+        : isCorrectCart(doc.stage, items)
+  const bingoRound = doc.stage === BINGO_STAGE ? roundOf(doc.bingo?.step) : null
+  const lastStep = doc.stage === LAST_STAGE ? (doc.last?.step ?? 'basket') : null
+  /** LAST の注文の問題（エントツとボール・スーパーボールと金庫で別） */
+  const lastProblem = lastStep ? LAST_PROBLEMS[lastStep] : undefined
+
+  /** このラウンドの問題（取り出し依頼で答える） */
+  const requestProblem = bingoRound ? ROUNDS[bingoRound].problem : undefined
+  /** 取り出し依頼。届いた注文の番号が合っていれば、解けたことにする */
+  const onRequest = (code: string): RequestResult => {
+    // LAST：ルドリーの宅配ソックスから取り出す（エルフが番号を確かめる）
+    if (lastStep) {
+      if (lastStep !== 'basket') return 'none'
+      if (code !== LAST_REQUEST_CODE) return 'wrong'
+      setShopOpen(false)
+      update({ last: { ...DEFAULT_LAST, ...doc.last, step: 'extract' } })
+      return 'ok'
+    }
+    const order = doc.order
+    if (!order || order.status !== 'delivered' || !requestProblem?.request) return 'none'
+    if (code !== requestProblem.answer) return 'wrong'
+    setShopOpen(false)
+    onSolved()
+    return 'ok'
+  }
+
   const sockCode = (() => {
     const order = doc.order
     if (!order) return undefined
+    if (lastProblem) return lastProblem.code
     const first = products.find((p) => p.id === order.items[0]?.id)
     if (first) return PROBLEMS[first.category].code
     if (isGame1LoseCart(order.items)) return PROBLEMS.game1.code
@@ -154,7 +199,7 @@ export default function PlayerScreen({ team }: { team: number }) {
     doc.phase === 'game' &&
     ORDER_STAGES.includes(doc.stage) &&
     !!doc.order &&
-    isCorrectCart(doc.stage, doc.order.items) &&
+    correctCart(doc.order.items) &&
     (doc.order.status === 'solved' || localProceedAt != null)
   const counting = showGuide && proceedAt != null && proceedAt > now
   const adultWait = counting || (showGuide && stayed)
@@ -163,7 +208,7 @@ export default function PlayerScreen({ team }: { team: number }) {
   const onSolved = () => {
     if (!doc.order) return
     const nextProceedAt =
-      ORDER_STAGES.includes(doc.stage) && isCorrectCart(doc.stage, doc.order.items) ? Date.now() + adultWaitMs(doc.stage) : undefined
+      ORDER_STAGES.includes(doc.stage) && correctCart(doc.order.items) ? Date.now() + adultWaitMs(doc.stage) : undefined
     if (nextProceedAt != null) {
       advancing.current = false
       setLocalProceedAt(nextProceedAt)
@@ -183,16 +228,27 @@ export default function PlayerScreen({ team }: { team: number }) {
   // 正しい注文（ステージ1は王冠・タンバリン・フラフープ、ステージ3はペンギン・ダチョウ）は、数秒後に自動で届ける
   useEffect(() => {
     const order = doc.order
-    if (!order || order.status !== 'ordered' || !isCorrectCart(doc.stage, order.items)) return
+    if (!order || order.status !== 'ordered' || !correctCart(order.items)) return
     const t = setTimeout(() => {
       update({ order: { items: order.items, status: 'delivered', at: order.at } })
     }, DELIVER_MS)
     return () => clearTimeout(t)
-  }, [doc.order, doc.stage, update])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.order, doc.stage, doc.bingo?.step, doc.last?.step, products, update])
+
+  // LAST：エントツとボールを入れて待ち時間が終わったら、タップを待たずに【重要】の通知へ
+  const ballsDone = adultReady && lastStep === 'balls'
+  useEffect(() => {
+    if (!ballsDone) return
+    setLocalProceedAt(null)
+    update({ last: { ...DEFAULT_LAST, ...doc.last, step: 'notice' } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ballsDone])
 
   useEffect(() => {
     if (!adultWait || proceedAt == null) return
-    const t = setTimeout(() => setNow(Date.now()), Math.max(0, proceedAt - Date.now()))
+    // タイマーはわずかに早く鳴ることがあるので、少し遅らせ、時刻も proceedAt 以上にする（早いと待ちのまま止まる）
+    const t = setTimeout(() => setNow(Math.max(Date.now(), proceedAt)), Math.max(0, proceedAt - Date.now()) + 50)
     return () => clearTimeout(t)
   }, [adultWait, proceedAt])
 
@@ -229,10 +285,14 @@ export default function PlayerScreen({ team }: { team: number }) {
       orderedQty: [],
       searched: [],
       markCleared: false,
+      markSolved: false,
+      sockTold: false,
       searchUnlocked: false,
       records: [],
       hide: { tutorialDone: false, found: 0 },
       word: DEFAULT_WORD,
+      bingo: DEFAULT_BINGO,
+      last: DEFAULT_LAST,
     })
     setCart([])
     setRecordsOpen(false)
@@ -274,7 +334,7 @@ export default function PlayerScreen({ team }: { team: number }) {
           scene={edited ?? NOVEL[doc.stage - 1]}
           // フェードインが終わって、何もない背景を少し見せてからキャラを出す
           lead={fading ? FADE_MS + 800 : undefined}
-          onFinish={() => (doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE ? fadeThen(() => update({ phase: 'game' })) : update({ phase: 'game' }))}
+          onFinish={() => (doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE || doc.stage === BINGO_STAGE || doc.stage === LAST_STAGE ? fadeThen(() => update({ phase: 'game' })) : update({ phase: 'game' }))}
         />
       </>
     )
@@ -304,13 +364,38 @@ export default function PlayerScreen({ team }: { team: number }) {
           onChairDone={() => setChair(false)}
         />
       )
+    } else if (doc.stage === LAST_STAGE) {
+      body = (
+        <LastGame
+          key={`g${doc.stage}-${doc.enterAt ?? 0}`}
+          doc={doc}
+          update={update}
+          shopOpen={shopOpen}
+          // 【重要】の通知から、フェードでマスターエルフの会話へ
+          onNotice={() => fadeThen(() => update({ phase: 'clear', last: { ...DEFAULT_LAST, ...doc.last, step: 'super' } }))}
+        />
+      )
+    } else if (doc.stage === BINGO_STAGE) {
+      body = (
+        <BingoGame
+          key={`g${doc.stage}-${doc.enterAt ?? 0}`}
+          doc={doc}
+          update={update}
+          shopOpen={shopOpen}
+          onDone={() =>
+            fadeThen(() => update({ stage: doc.stage + 1, phase: 'novel', order: null, bingo: { ...DEFAULT_BINGO, ...doc.bingo, step: 'done' } }))
+          }
+        />
+      )
     } else {
       const Game = GAMES[doc.stage - 1]
       body = (
         <Game
-          key={`g${doc.stage}`}
+          key={`g${doc.stage}-${doc.markSolved ? 's' : ''}`}
           stage={doc.stage}
-          onClear={() => update({ phase: 'clear' })}
+          // ステージ1：マークと得点が分かったら、画面はそのままで続きの説明へ
+          solved={doc.stage === 1 && !!doc.markSolved}
+          onClear={() => (doc.stage === 1 ? update({ markSolved: true }) : update({ phase: 'clear' }))}
         />
       )
     }
@@ -322,9 +407,11 @@ export default function PlayerScreen({ team }: { team: number }) {
         onFinish={() => {
           if (doc.stage === 1) update({ phase: 'game', markCleared: true })
           if (doc.stage === HIDE_STAGE) setClearNext(doc.stage)
+          // LAST：マスターエルフの話のあと、ルドリーのための注文に戻る
+          if (doc.stage === LAST_STAGE) update({ phase: 'game' })
         }}
         endButton={
-          doc.stage === 1 || doc.stage === HIDE_STAGE
+          doc.stage === 1 || doc.stage === HIDE_STAGE || doc.stage === LAST_STAGE
             ? undefined
             : {
                 label: '次に進む',
@@ -335,7 +422,8 @@ export default function PlayerScreen({ team }: { team: number }) {
       />
     )
   } else {
-    body = <NovelPart key="end" scene={edited ?? ENDING} onFinish={() => {}} />
+    // LAST の最後（エルフがルドリーのボールを入れる → エクストラゲーム）
+    body = <LastEnding key={`end-${doc.enterAt ?? 0}`} />
   }
 
   // 会話・ゲーム画面は枠なしで、背景画像を画面全体に出す。下にメニューボタンを並べる
@@ -345,8 +433,45 @@ export default function PlayerScreen({ team }: { team: number }) {
   // ステージ3は、押さえてワードを2つ終えて部屋のお題が出てから
   const markQuiz =
     (doc.stage === 1 && doc.phase === 'game' && !doc.markCleared) ||
-    (doc.stage === WORD_STAGE && doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'room')
+    (doc.stage === WORD_STAGE && doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'room') ||
+    // ステージ4は、ラウンド中で山札がそろう前だけ
+    (doc.stage === BINGO_STAGE && doc.phase === 'game' && (!bingoRound || !!doc.bingo?.deckIn)) ||
+    // LAST は、取り出したあとの会話と【重要】の通知のあいだは注文できない
+    (lastStep != null && doc.phase === 'game' && (lastStep === 'extract' || lastStep === 'notice'))
   const records = (doc.records ?? []).filter((id) => RECORDS[id])
+  // 「やるべきこと」：そのステージでやること と、子どものキモチ（ハートの代わり）
+  const task: { text?: string; mood?: Mood } = (() => {
+    if (doc.phase !== 'game') return {}
+    if (doc.stage === 1) return doc.markCleared ? { text: STAGE1_TASK, mood: ST1_MOOD_AFTER } : { mood: ST1_MOOD }
+    if (doc.stage === HIDE_STAGE) return { mood: ST2_MOOD }
+    if (doc.stage === WORD_STAGE) return (doc.word?.step ?? 'rule') === 'rule' ? {} : { mood: ST3_MOOD }
+    if (doc.stage === BINGO_STAGE) return doc.bingo?.jack ? { mood: ST4_MOOD } : {}
+    if (doc.stage === LAST_STAGE) return { mood: lastStep === 'super' ? LAST_MOOD_AFTER : LAST_MOOD }
+    return {}
+  })()
+  // ステージ1の案内中に、注文ボタンだけ押せるようにする
+  const canOrder = !markQuiz || guideWait === 'shop'
+  const delivered = doc.order?.status === 'delivered'
+  const orderAt = doc.order?.at ?? null
+  // 注文が変わったら、ナゾは閉じた状態から
+  useEffect(() => setProblemOpen(false), [orderAt])
+  const openProblem = () => {
+    if (!delivered) return
+    setShopOpen(false)
+    setArrivedSeenAt(orderAt)
+    setProblemOpen(true)
+  }
+  // ステージ1：マークが分かったあとの説明（マークの画面のまま）
+  const rulesGuide = loaded && entered && doc.stage === 1 && doc.phase === 'game' && !!doc.markSolved && !doc.markCleared && !blackout
+  // ステージ1：正しい注文が届いたあとの、ソックスキーの説明
+  const sockGuide =
+    loaded && entered && doc.stage === 1 && doc.phase === 'game' && !!doc.markCleared && !doc.sockTold &&
+    delivered && !!doc.order && correctCart(doc.order.items) && arrivedSeenAt === orderAt
+  useEffect(() => {
+    if (sockGuide) setShopOpen(false)
+  }, [sockGuide])
+  // ソックスキーを導くボタンは、注文できる場面で出す（届くまでは灰色）
+  const showSockKey = !markQuiz && doc.phase === 'game' && !shopOpen
   // 会話中に開いたままの画面は閉じる。テキストを送る以外の操作を残さない
   useEffect(() => {
     if (!talking && !markQuiz) return
@@ -372,6 +497,10 @@ export default function PlayerScreen({ team }: { team: number }) {
                 tab={szTab}
                 onTab={setSzTab}
                 searchUnlocked={!!doc.searchUnlocked || doc.stage > HIDE_STAGE}
+                // 取り出し依頼ボタンはステージ4から、ずっと出す
+                onRequest={doc.stage >= BINGO_STAGE ? onRequest : undefined}
+                // 届いた注文のナゾ（閉じていても、ここから開き直せる）
+                onOpenProblem={openProblem}
                 guide={doc.phase === 'game' && doc.stage === HIDE_STAGE ? guide.sz : null}
                 onBeforeOrder={() => {
                   // ステージ3：はじめて正しい注文をしたときは、カイ・メイが止めに入る
@@ -383,33 +512,67 @@ export default function PlayerScreen({ team }: { team: number }) {
               />
             )}
           </div>
-          <GameMenu
+          {/* 最後（エンディング・エクストラゲーム）は、下のボタンを出さない */}
+          {doc.phase !== 'end' && <GameMenu
             shopOpen={shopOpen}
             locked={talking}
             onOrder={
-              markQuiz
+              !canOrder
                 ? undefined
                 : () => {
                     if (!shopOpen) setSzTab('list')
                     setShopOpen(!shopOpen)
                   }
             }
-            onTask={doc.stage === 1 && (doc.phase === 'clear' || doc.markCleared) ? () => setTaskOpen(true) : undefined}
+            onTask={task.text || task.mood ? () => setTaskOpen(true) : undefined}
             onRecord={records.length ? () => setRecordsOpen(true) : undefined}
-            guide={doc.phase === 'game' && doc.stage === HIDE_STAGE && guide.menu ? '注文' : null}
-            guided={doc.phase === 'game' && doc.stage === HIDE_STAGE && (guide.menu || !!guide.sz)}
-          />
-          {!talking && doc.order?.status === 'delivered' && closedDeliveryAt !== doc.order.at && (
-            <ProblemDialog order={doc.order} onSolved={onSolved} onClose={() => setClosedDeliveryAt(doc.order?.at ?? null)} />
-          )}
-          {!talking && doc.order?.status === 'delivered' && closedDeliveryAt === doc.order.at && (
-            <button className={`sock-btn${(doc.stage === 1 && doc.markCleared) || doc.stage === WORD_STAGE ? ' is-shifted' : ''}`} onClick={() => setClosedDeliveryAt(null)}>
+            guide={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && guide.menu) ? '注文' : null}
+            guided={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && (guide.menu || !!guide.sz))}
+          />}
+          {showSockKey && !talking && (
+            <button className="sock-key-btn" disabled={!delivered} onClick={openProblem}>
               <svg viewBox="0 0 64 80" aria-hidden>
                 <path fill="currentColor" d="M16 24h30v24c0 1 1 4 6 6 7 3 10 8 7 14-3 6-12 8-20 5L22 65c-8-4-12-11-10-18l4-8V24z" />
                 <rect x="12" y="6" width="38" height="20" rx="6" fill="#fff" stroke="currentColor" strokeWidth="4" />
               </svg>
-              <span>宅配ソックスナゾの再表示</span>
+              <span>ソックスキーを導く</span>
             </button>
+          )}
+          {!talking && delivered && doc.order && arrivedSeenAt !== orderAt && (
+            <ArrivalNotice onClose={() => setArrivedSeenAt(orderAt)} />
+          )}
+          {!talking && delivered && doc.order && problemOpen && (
+            <ProblemDialog
+              order={doc.order}
+              problem={bingoRound ? ROUNDS[bingoRound].problem : lastProblem}
+              onSolved={onSolved}
+              onClose={() => setProblemOpen(false)}
+            />
+          )}
+          {rulesGuide && (
+            <GuideTalk
+              key="rules"
+              lines={RULES_AFTER_MARK}
+              shopOpen={shopOpen}
+              sockOpen={problemOpen}
+              onWait={setGuideWait}
+              onDone={() =>
+                fadeThen(() => {
+                  setShopOpen(false)
+                  update({ markCleared: true })
+                })
+              }
+            />
+          )}
+          {sockGuide && (
+            <GuideTalk
+              key="sock"
+              lines={SOCK_TUTORIAL}
+              shopOpen={shopOpen}
+              sockOpen={problemOpen}
+              onWait={setGuideWait}
+              onDone={() => update({ sockTold: true })}
+            />
           )}
           {!talking && adultWait && (
             <div className="sz-elf-back is-static">
@@ -417,13 +580,14 @@ export default function PlayerScreen({ team }: { team: number }) {
                 <img src={characterImage('Common', '真顔')} alt="" />
                 <p className="is-three">
                   <span>エルフ</span>
-                  <em>【<b>行動シート</b>】に記入して、大人部屋に向かいましょう。</em>
+                  {/* LAST のルドリーのための注文は、大人部屋にはもう入れない */}
+                  <em>{lastStep === 'super' ? <>【<b>行動シート</b>】に記入してください。</> : <>【<b>行動シート</b>】に記入して、大人部屋に向かいましょう。</>}</em>
                   <em>宅配ソックスの番号は「<b>{sockCode}</b>」です。</em>
                 </p>
               </div>
             </div>
           )}
-          {!talking && adultReady && (
+          {!talking && adultReady && lastStep !== 'balls' && (
             <div className="stage-next" onClick={goNext}>
               <div className="stage-next-row">
                 <i>▼</i>
@@ -459,9 +623,24 @@ export default function PlayerScreen({ team }: { team: number }) {
           )}
           {!talking && taskOpen && (
             <div className="modal-back" onClick={() => setTaskOpen(false)}>
-              <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
                 <h2>やるべきこと</h2>
-                <p className="task-text">{STAGE1_TASK}</p>
+                {task.text && <p className="task-text">{task.text}</p>}
+                {/* 子どものキモチ（前はハートのボタンで見ていたもの） */}
+                {task.mood && (
+                  <div className="task-mood">
+                    <img src={task.mood.icon} alt="" />
+                    <div>
+                      <h3>{task.mood.name}のキモチ</h3>
+                      {task.mood.lines.map((l, i) => (
+                        <p key={i}>
+                          {l.who && <small>{l.who}</small>}
+                          {task.mood!.lines.length > 1 ? `「${l.text}」` : l.text}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <button onClick={() => setTaskOpen(false)}>閉じる</button>
               </div>
             </div>

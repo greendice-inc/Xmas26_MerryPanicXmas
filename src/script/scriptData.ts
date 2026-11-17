@@ -5,6 +5,7 @@ import {
   ENDING,
   NOVEL,
   characterImage,
+  masterElfImage,
   st2Silhouette,
   ST2_KIDS,
   type Emotion,
@@ -69,12 +70,13 @@ export const SCRIPT_TABS = ['Stage1', 'Stage2', 'Stage3', 'Stage4', 'StageF'] as
 /** 編集できる場面 */
 export const SCENES: SceneDef[] = [
   { id: 'st1-intro', tab: 'Stage1', label: '導入', base: NOVEL[0] },
-  { id: 'st1-clear', tab: 'Stage1', label: 'クリア後', base: CLEAR[0] },
   { id: 'st2-intro', tab: 'Stage2', label: '導入', base: NOVEL[1] },
   { id: 'st2-clear', tab: 'Stage2', label: 'クリア後', base: CLEAR[1] },
   { id: 'st3-intro', tab: 'Stage3', label: '導入', base: NOVEL[2] },
   { id: 'st4-intro', tab: 'Stage4', label: '導入', base: NOVEL[3] },
   { id: 'st4-clear', tab: 'Stage4', label: 'クリア後', base: CLEAR[3] },
+  { id: 'st5-intro', tab: 'StageF', label: 'LAST導入', base: NOVEL[4] },
+  { id: 'st5-clear', tab: 'StageF', label: 'マスターエルフ', base: CLEAR[4] },
   { id: 'stF-ending', tab: 'StageF', label: 'エンディング', base: ENDING },
 ]
 
@@ -104,8 +106,9 @@ export const DEFAULT_CHARS: ScriptChar[] = [
   { id: 'jimmy', name: 'ジミー', note: 'ステージ2', images: sameImage(ST2_KIDS.jimmy.image) },
   { id: 'tommy', name: 'トミー', note: 'ステージ2', images: sameImage(ST2_KIDS.tommy.image) },
   { id: 'st3', name: 'カイ・メイ', note: 'ステージ3', images: folderImages('Stage3') },
-  { id: 'st4', name: 'サンタ', note: 'ステージ4', images: folderImages('Stage4') },
-  { id: 'stF', name: 'サンタ', note: 'エンディング', images: folderImages('StageF') },
+  { id: 'st4', name: 'ロビン', note: 'ステージ4', images: folderImages('Stage4') },
+  { id: 'stF', name: 'ルドリー', note: 'LAST', images: folderImages('StageF') },
+  { id: 'master', name: 'マスターエルフ', note: 'LAST', images: Object.fromEntries(EMOTIONS.map((e) => [e, masterElfImage(e)])) },
 ]
 
 const FOLDER_CHAR: Record<string, string> = {

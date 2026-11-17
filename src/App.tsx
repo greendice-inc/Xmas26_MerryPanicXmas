@@ -15,7 +15,8 @@ import PlayerScreen from './screens/PlayerScreen'
 import StaffScreen from './screens/StaffScreen'
 import TopScreen from './screens/TopScreen'
 import { useAdultSkip } from './adultWait'
-import type { Identity } from './types'
+import { DEFAULT_BINGO, type BingoStep, type Identity, type LastStep } from './types'
+import { LAST_STEPS } from './games/lastData'
 
 /** 開発用の商品登録は ?debug=true のときだけ開く */
 function isDebug(): boolean {
@@ -78,6 +79,10 @@ function PlayerHiddenMenu({ team, onReset, onReconnect }: { team: number; onRese
         const wordStep =
           stage === 3 && phase === 'game' ? (wordSteps.find((w) => w === step) ?? 'rule') : stage > 3 || phase === 'end' ? 'room' : 'rule'
         const pastStage3 = stage > 3 || phase === 'end'
+        // ステージ4：ビンゴの位置。説明が済んでいれば、キモチとジャック機能が使える
+        const bingoSteps: BingoStep[] = ['rule', 'r1', 'r2']
+        const bingoStep: BingoStep =
+          stage === 4 && phase === 'game' ? (bingoSteps.find((b) => b === step) ?? 'rule') : stage > 4 || phase === 'end' ? 'done' : 'rule'
         getBackend()
           .set('teams', String(team), {
             started: true,
@@ -90,11 +95,24 @@ function PlayerHiddenMenu({ team, onReset, onReconnect }: { team: number; onRese
             searched,
             // ステージ1のゲーム2（正しい注文）は、特定が終わったあとの子供部屋
             markCleared: stage === 1 && step === 'order',
+            // ステージ1の説明：マーク当ての途中から入るときだけ、まだ解けていない
+            markSolved: !(stage === 1 && phase !== 'game') && !(stage === 1 && step === 'quiz'),
+            sockTold: stage > 1 || phase === 'end',
             // ステージ2の案内でリスト追加検索と商品カードが解放される。それより後はすでに解放済み
             searchUnlocked: stage > 2 || phase === 'end' || stage2Played,
             records: stage > 2 || phase === 'end' || stage2Played ? ['st2-card'] : [],
             hide: { tutorialDone: stage2Played, found },
             word: { step: wordStep, chairTold: pastStage3 },
+            bingo: { ...DEFAULT_BINGO, step: bingoStep, jack: bingoStep !== 'rule' },
+            // LAST：注文の位置。エンディングは、マスターエルフの話まで済んでいる
+            last: {
+              step:
+                stage === 5 && phase === 'game'
+                  ? (LAST_STEPS.find((s) => s === step) ?? 'basket')
+                  : phase === 'end' || (stage === 5 && phase === 'clear')
+                    ? ('super' as LastStep)
+                    : 'basket',
+            },
             enterAt: Date.now(),
             updatedAt: Date.now(),
           })

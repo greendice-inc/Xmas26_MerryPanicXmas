@@ -23,6 +23,17 @@ const JUMP_GAMES: Record<number, { label: string; step?: JumpTarget['step'] }[]>
     { label: 'ゲーム2', step: 'g2' },
     { label: 'お題', step: 'room' },
   ],
+  4: [
+    { label: '説明', step: 'rule' },
+    { label: 'ROUND1', step: 'r1' },
+    { label: 'ROUND2', step: 'r2' },
+  ],
+  5: [
+    { label: '開始', step: 'basket' },
+    { label: '取り出し後', step: 'balls' },
+    { label: '重要通知', step: 'notice' },
+    { label: 'マスター後', step: 'super' },
+  ],
 }
 
 interface Props {

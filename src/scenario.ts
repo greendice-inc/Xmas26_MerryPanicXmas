@@ -53,16 +53,50 @@ export interface NovelScene {
   lines: NovelLine[]
 }
 
-/** ステージ1の導入。案内役のエルフと子供（Stage1）の会話 */
+const elf1 = (text: string, emotion: Emotion = '真顔'): NovelLine => ({ speaker: 'エルフ', character: 'Common', text, emotion })
+const rin = (text: string, emotion: Emotion = '楽', speaker = 'リン'): NovelLine => ({ speaker, text, emotion })
+
+/** ステージ1：リンのキモチ。マークを当てているあいだと、リングを投げたあと */
+export const ST1_MOOD: Mood = {
+  icon: characterImage('Stage1', '楽'),
+  name: 'リン',
+  lines: [{ text: '小さいころからわなげは得意だったんだもん。このゲームも絶対に勝てるはず！' }],
+}
+export const ST1_MOOD_AFTER: Mood = {
+  icon: characterImage('Stage1', '喜'),
+  name: 'リン',
+  lines: [{ text: '1億ポイント取ったと思って、大喜びしている。' }],
+}
+
+/** ステージ1の導入。エルフとリン（子ども部屋からの通信） */
 const STAGE1_INTRO: NovelScene = {
   character: 'Stage1',
   background: 'Stage1',
   lines: [
-    { speaker: 'エルフ', character: 'Common', text: 'こんにちは！{笑顔}にしましょう！', emotion: '楽' },
-    { speaker: 'エルフ', character: 'Common', text: '{ルール}を説明するね。詳しいルールは後ろのラミネートを取ってね。', emotion: '真顔' },
-    { speaker: '子供', text: 'こんにちは', emotion: '真顔' },
-    { speaker: '子供', text: '僕の{対戦相手}だね。', emotion: '楽' },
-    { speaker: 'エルフ', character: 'Common', text: 'まずはどの{マーク}が何点なのか特定しよう。', emotion: '真顔' },
+    elf1('こんにちは！{笑顔}にしましょう！一行あたりの\n文字数を知りたいから長い文章を書かせてもらいますよ。\nどこまで入りますかねえ～？改行はできないのかな？', '楽'),
+    elf1('それでは、さっそく次のゲームを始めましょう。'),
+    elf1('子ども部屋からの通信です。'),
+    rin('こんにちは！', '楽', '？？？'),
+    rin('私はリンだよー！', '喜', '？？？'),
+    rin('私とやるゲームは{『ポイントリング』}！！', '喜'),
+    rin('リングを投げて、ポイントをゲットするゲームみたい！'),
+    elf1('このゲームは、おおざっぱに言うと{わなげゲーム}です。\nより高いポイントをゲットした方の勝ちです。'),
+    elf1('それぞれの部屋には、{ターゲット}が設置されます。\n投げ手の人は、そのターゲットに向かって{リング}を投げます。'),
+    elf1('リングが通ったターゲットに応じて、ポイントが入ります。'),
+    elf1('ちなみに、\nリングがどのターゲットにも通らなかった場合は……'),
+    elf1('やる気なしとみなされ、\n負けではなく{「失格」}となりますのでご注意ください。', '怒'),
+    rin('ポイントは何で決まるんだろう？', '真顔'),
+    elf1('このゲームでは、{「楽器を持っている・身に着けている動物」}が\n{ターゲット}となります。'),
+    elf1('そして、ターゲットが身に着けている{タグ}に描かれた\n{マーク}によって、ゲットできるポイントが決まります。'),
+    elf1('どのマークが何ポイントなのかは、ナゾを解くことで分かります。'),
+    rin('なるほどね。じゃあ、ナゾをしっかり解かないと、\nどれを狙えばいいかが分からないんだ。', '真顔'),
+    rin('オッケー！ナゾを解こう！', '喜'),
+    // エルフがこちら（大人）に向けて話す
+    elf1('ここで、リンさんの気持ちを読み取っておきましょう……'),
+    rin('小さいころから{わなげ}は得意だったんだもん。\nこのゲームも{絶対に勝てるはず！}', '楽', 'リン（心の声）'),
+    elf1('それでは、まずナゾを解きましょう！', '楽'),
+    elf1('机の上のラックにある「第1ゲーム」のクリアファイルから\n{5枚のナゾだけを取り出し}てください。'),
+    elf1('それぞれのマークが何ポイントなのかが分かったところで、\n続きのルール説明をしていきます。'),
   ],
 }
 
@@ -159,11 +193,123 @@ const STAGE3_INTRO: NovelScene = {
   ],
 }
 
+/** ステージ4：ロビン */
+export const ST4_NAME = 'ロビン'
+/** ステージ4：ジャック機能のアイコン */
+export const JACK_ICON = `${BASE}BG/Common/noz_icon.webp`
+/** ステージ4：ビンゴカードと、穴の画像 */
+export const BINGO_CARD_IMAGE = `${BASE}BG/Stage4/bingo/bingo_card.png`
+export const BINGO_HIT_IMAGE = `${BASE}BG/Stage4/bingo/hit.png`
+
+/** ステージ4：ロビンのキモチ */
+export const ST4_MOOD: Mood = {
+  icon: characterImage('Stage4', '楽'),
+  name: ST4_NAME,
+  lines: [{ text: '勝ちたいなあ～' }],
+}
+
+/** ステージ4の導入。ロビンとカタカナビンゴ（ルール説明の続きはゲーム画面で） */
+const STAGE4_INTRO: NovelScene = {
+  character: 'Stage4',
+  background: 'Stage4',
+  lines: [
+    { speaker: ST4_NAME, text: 'あ！対戦相手？', emotion: '真顔' },
+    { speaker: ST4_NAME, text: '勝つぞ～！', emotion: '楽' },
+    { speaker: 'エルフ', character: 'Common', text: '今回のゲームのルールを説明します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '最初はチュートリアルを行いながらルールを説明します。', emotion: '真顔' },
+  ],
+}
+
+/** LAST：ルドリー（ゲームマスター） */
+export const STF_NAME = 'ルドリー'
+/** LAST：マスターエルフ（エルフの上位存在）の立ち絵 */
+export const masterElfImage = (emotion: Emotion = '真顔') => `${BASE}character/StageF/master_elf_${emotion}.png`
+export const MASTER_ELF_NAME = 'マスターエルフ'
+
+/** LAST：ルドリーのキモチ。マスターエルフの話のあとで「逆転勝利したい！」に変わる */
+export const LAST_MOOD: Mood = {
+  icon: characterImage('StageF', '楽'),
+  name: STF_NAME,
+  lines: [{ text: '大人のみんなと真剣勝負がしたい！' }],
+}
+export const LAST_MOOD_AFTER: Mood = {
+  icon: characterImage('StageF', '怒'),
+  name: STF_NAME,
+  lines: [{ text: '逆転勝利したい！' }],
+}
+
+const master = (text: string, emotion: Emotion = '真顔'): NovelLine => ({ speaker: MASTER_ELF_NAME, text, emotion, charSrc: masterElfImage(emotion) })
+const rud = (text: string, emotion: Emotion = '哀', speaker = STF_NAME): NovelLine => ({ speaker, text, emotion })
+
+/** LAST：大人がルドリーのアイテムを取り出してしまったあと。マスターエルフが出てくる */
+const LAST_TWIST: NovelScene = {
+  character: 'StageF',
+  background: 'StageF',
+  lines: [
+    master('あなた達、何をしてるんですか！？\nルドリーの様子を見てみなさい！！', '怒'),
+    rud('なんかね、アイテムをね、発送したんだけど、\n宅配ソックスには届いたって連絡は来てて、'),
+    rud('そのナゾを解いたんだけど、\n開けようとしたら、モニターは消えてて、'),
+    rud('番号は合ってるはずなのに、開かなくて……'),
+    master('あなた達、とんでもないことをしましたね。', '怒'),
+    master('あなた達が宅配ソックスから取り出した、いえ奪ったのは、\nまさしくルドリーが注文したアイテムです。', '怒'),
+    master('結果として、あなた達は\n生還目標ポイントを獲得できたかもしれません。'),
+    master('しかし……当然ですが……'),
+    master('ルドリーをこんな目に合わせるような大人を、\nエルフとして許すわけにはいきません。', '怒'),
+    master('心を読んでみましょうか？'),
+    rud('どうして宅配ソックスが開かないんだろう？\n今のままじゃ、何もできないままボクが負けちゃう！', '哀', 'ルドリー（心の声）'),
+    rud('……でも、あきらめちゃだめだ！\nここから逆転する方法があるはずだ。', '真顔', 'ルドリー（心の声）'),
+    rud('こうなったらなんとかして勝って終わりたい……！\nいち、に、に、ご……いち、に、に、ご……', '怒', 'ルドリー（心の声）'),
+    master('どうやら、ルドリーはまだ希望を捨てていないようです。'),
+    master('先ほどあなた達が大人部屋で取った行動を\n打ち消すことはできません。'),
+    master('そして、大人部屋に入ること自体もうできません。'),
+    master('あなた達の力で、この状況からルドリーを勝利に導き、\n喜ばせてください！！！', '怒'),
+  ],
+}
+
+/** LAST：エントツの説明画像 */
+const entotsu = (n: '' | '2' | '3') => `${BASE}BG/StageF/entotsu_setsumei${n}.png`
+
+/** LAST の前説。ルドリーとエルフがエントツギフトのルールを説明する（1つの吹き出しは2行まで） */
+const LAST_INTRO: NovelScene = {
+  character: 'StageF',
+  background: 'StageF',
+  lines: [
+    { speaker: 'エルフ', character: 'Common', text: 'さて、いよいよ次が最後のゲームですね。', emotion: '真顔' },
+    { speaker: '？？？', text: 'いよいよファイナルゲーム。\nこのボク、ルドリーが相手だ！', emotion: '楽' },
+    { speaker: STF_NAME, text: 'ファイナルゲームは「エントツギフト」\nルールは簡単。', emotion: '楽' },
+    { speaker: STF_NAME, text: '子ども部屋と大人部屋に、\nこのゲームのためのエントツが用意されているんだ。', emotion: '真顔' },
+    { speaker: STF_NAME, text: 'このエントツにボールが通ったら10ポイントで、\n最終的にポイントが多い方が勝ち！', emotion: '楽' },
+    { speaker: STF_NAME, text: '詳しいルール説明はエルフさん、お願いします！', emotion: '喜' },
+    { speaker: 'エルフ', character: 'Common', text: 'それでは詳しいルールについて説明します。\nまず、ポイントの獲得方法について。', emotion: '真顔', slide: entotsu('') },
+    { speaker: 'エルフ', character: 'Common', text: 'エントツの内部には、一番下のところにセンサーがあり、', emotion: '真顔', slide: entotsu('2') },
+    { speaker: 'エルフ', character: 'Common', text: 'ここを1個のボールが1回通過するたびに\n10ポイントが入ります。', emotion: '真顔', slide: entotsu('3') },
+    { speaker: 'エルフ', character: 'Common', text: 'このゲームでは大人チームが先に行動をします。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '大人チームは必要だと思うアイテムを発送し、\n用意したすべてのボールをエントツに投入します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'その後、子どもチームが同様にアイテムを発送し、\nすべてのボールをエントツに投入します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'ボールの投入をはじめとした行動は、\nすべてエルフが行います。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'エントツの上の端の高さから、勢いをつけずに落とすので、\n大人も子どもも同じ条件で投入されることになります。', emotion: '真顔' },
+    { speaker: 'ゲームマスター・ルドリー', text: 'それから、ボクはあんまりよく知らないんだけど、\n大人はこのゲームで達成しないといけない目標があるんだよね？', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'そうです。このゲームを通して、大人たちは\n200ポイントを越えるポイントを獲得しなければなりません。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '200ポイントちょうどではダメです。\n200ポイントを越えてください。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'これは、このゲームに真剣に取り組んでもらうための\n目標設定であり、', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '大人の皆さんはこの条件を達成しないと生還できません。\n是非がんばってくださいね。', emotion: '楽' },
+    { speaker: 'ゲームマスター・ルドリー', text: '大人って大変なんだね。', emotion: '哀' },
+    { speaker: 'ゲームマスター・ルドリー', text: 'ボクとしても、この最後のゲームでは\n大人のみんなにも全力を出してほしいんだ。', emotion: '真顔' },
+    { speaker: 'ゲームマスター・ルドリー', text: '真剣勝負の結果なら、もし負けたとしても、\nボクは笑って終われると思うから。', emotion: '楽' },
+    { speaker: 'エルフ', character: 'Common', text: 'それでは間もなくゲーム開始となります。', emotion: '真顔' },
+    { speaker: 'ゲームマスター・ルドリー', text: 'じゃあボクも準備を始めよう。\n大人のキミたちもがんばってね！', emotion: '喜' },
+    { speaker: 'エルフ', character: 'Common', text: '必要なアイテムを発送し、\nあなた達の「大人の全力」を見せてください。', emotion: '楽' },
+  ],
+}
+
 /** ノベルパートのシナリオ。添字はステージ番号 - 1（ステージ番号は 1〜GAME_COUNT） */
 export const NOVEL: NovelScene[] = Array.from({ length: GAME_COUNT }, (_, i): NovelScene => {
   if (i === 0) return STAGE1_INTRO
   if (i === 1) return STAGE2_INTRO
   if (i === 2) return STAGE3_INTRO
+  if (i === 3) return STAGE4_INTRO
+  // ステージ4のあとは LAST（ファイナルゲーム）
+  if (i === 4) return LAST_INTRO
   // 素材が揃っているのは Stage1〜4。5以降は仮で Stage1 を使う
   return {
     character: `Stage${i < 4 ? i + 1 : 1}`,
@@ -248,6 +394,8 @@ const STAGE1_CLEAR: NovelScene = {
 export const CLEAR: NovelScene[] = NOVEL.map((n, i): NovelScene => {
   if (i === 0) return STAGE1_CLEAR
   if (i === 1) return STAGE2_CLEAR
+  // LAST のクリア会話は、マスターエルフが出てくる場面（ゲームの途中で入る）
+  if (i === 4) return LAST_TWIST
   return {
     character: n.character,
     background: n.background,

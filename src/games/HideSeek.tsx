@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import AreaEditor from '../components/AreaEditor'
-import MoodCard from '../components/MoodCard'
 import type { SzGuide, SzTab } from '../components/Santazon'
 import { useProducts } from '../santazon/useProducts'
-import { characterImage, MANNEQUIN_IMAGE, RECORDS, ST2_KIDS, ST2_MOOD, st2GameImage, type Emotion } from '../scenario'
+import { characterImage, MANNEQUIN_IMAGE, RECORDS, ST2_KIDS, st2GameImage, type Emotion } from '../scenario'
 import type { HideProgress, TeamDoc } from '../types'
 import {
   areasToCode,
@@ -178,7 +177,6 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
   const [trick, setTrick] = useState(false)
   const [talk, setTalk] = useState<{ role: 'amy' | 'jimmy' | 'tommy'; lines: string[]; idx: number; banner?: string } | null>(null)
   const [banner, setBanner] = useState<string | null>(null)
-  const [mood, setMood] = useState(false)
 
   // トミーまで見つけた状態で入り直したら、最後の台詞からやり直す
   useEffect(() => {
@@ -304,9 +302,6 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
               <img src={ST2_KIDS[lastKid].image} alt="" />
             </button>
           )}
-          <button className="mood-heart hide-heart" aria-label="三人のキモチ" onClick={() => setMood(true)}>
-            <span />
-          </button>
         </>
       )}
 
@@ -329,7 +324,6 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
         </div>
       )}
 
-      {mood && <MoodCard mood={ST2_MOOD} onClose={() => setMood(false)} />}
 
       {line &&
         overlay(

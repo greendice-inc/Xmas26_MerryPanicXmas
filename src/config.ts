@@ -3,7 +3,9 @@ export const STAGE_H = 1200
 
 export const TEAM_COUNT = 12
 export const KEYBOX_COUNT = 4
-export const GAME_COUNT = 6
+/** ステージの数。最後（5）が LAST（ファイナルゲーム） */
+export const GAME_COUNT = 5
+export const LAST_STAGE = 5
 
 /**
  * キーボックスの無線設定の初期値（本番で決まったら、キーボックステスト画面で変える）

@@ -26,7 +26,7 @@ export interface JumpTarget {
    * quiz=マークと得点当て / order=正しい注文 / start=ゲームのはじめ / amy・jimmy・tommy=その子を見つけたあと
    * ステージ3は WordStep（rule=ルール説明 / g1・g2=押さえてワード / room=部屋のお題と注文）
    */
-  step?: 'quiz' | 'order' | 'start' | 'amy' | 'jimmy' | 'tommy' | WordStep
+  step?: 'quiz' | 'order' | 'start' | 'amy' | 'jimmy' | 'tommy' | WordStep | BingoStep | LastStep
 }
 
 export interface OrderItem {
@@ -67,6 +67,10 @@ export interface TeamDoc {
   searched: string[]
   /** ステージ1のクリア会話が終わり、子供部屋を見ている */
   markCleared: boolean
+  /** ステージ1：マークと得点がすべて分かった（このあと、マークの画面のまま続きの説明） */
+  markSolved?: boolean
+  /** ステージ1：ソックスキーの説明を聞いた */
+  sockTold?: boolean
   /** Santazon の「リスト追加検索」タブを出してよいか（ステージ2の案内で解放） */
   searchUnlocked?: boolean
   /** 「記録」から見返せる画像の id（RECORDS のキー） */
@@ -75,6 +79,10 @@ export interface TeamDoc {
   hide?: HideProgress
   /** ステージ3（押さえてワード）の進み具合 */
   word?: WordProgress
+  /** ステージ4（ビンゴ）の進み具合 */
+  bingo?: BingoProgress
+  /** LAST（ファイナルゲーム）の進み具合 */
+  last?: LastProgress
   updatedAt: number
 }
 
@@ -95,6 +103,35 @@ export interface WordProgress {
 
 export const DEFAULT_WORD: WordProgress = { step: 'rule', chairTold: false }
 
+/** ステージ4：rule=チュートリアル / r1・r2=ラウンド / done=終わった */
+export type BingoStep = 'rule' | 'r1' | 'r2' | 'done'
+
+export interface BingoProgress {
+  step: BingoStep
+  /** キモチ（ハート）とジャック機能を使える */
+  jack: boolean
+  /** 宅配ソックスの番号を聞いて、注文したカードが山札に入った */
+  deckIn: boolean
+  /** ゲーム開始を押した */
+  started: boolean
+  /** めくった枚数（ロビン・大人の順に交互） */
+  flips: number
+  /** 山札をめくる順（カードの番号） */
+  kidOrder: number[]
+  adultOrder: number[]
+}
+
+/** LAST：games/lastData.ts の LAST_STEPS を参照 */
+export type LastStep = 'basket' | 'extract' | 'balls' | 'notice' | 'super'
+
+export interface LastProgress {
+  step: LastStep
+}
+
+export const DEFAULT_LAST: LastProgress = { step: 'basket' }
+
+export const DEFAULT_BINGO: BingoProgress = { step: 'rule', jack: false, deckIn: false, started: false, flips: 0, kidOrder: [], adultOrder: [] }
+
 export const DEFAULT_TEAM: TeamDoc = {
   started: false,
   room: null,
@@ -109,6 +146,8 @@ export const DEFAULT_TEAM: TeamDoc = {
   records: [],
   hide: { tutorialDone: false, found: 0 },
   word: DEFAULT_WORD,
+  bingo: DEFAULT_BINGO,
+  last: DEFAULT_LAST,
   updatedAt: 0,
 }
 

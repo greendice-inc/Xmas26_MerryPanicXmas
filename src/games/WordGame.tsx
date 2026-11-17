@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import AreaEditor from '../components/AreaEditor'
-import MoodCard from '../components/MoodCard'
-import { characterImage, ST3_MOOD, ST3_NAME, st3GameImage, type Emotion } from '../scenario'
+import { characterImage, ST3_NAME, st3GameImage, type Emotion } from '../scenario'
 import { DEFAULT_WORD, type TeamDoc, type WordProgress } from '../types'
 import { resetWordAreas, saveWordAreas, useWordAreas, wordAreasToCode, type WordArea } from './wordAreas'
 
@@ -50,14 +49,14 @@ const CHAIR_DIALOGS = ['画面に表示されている青い丸は椅子だっ�
 /** 部屋でやるお題 */
 const THEME = 'クリスマスツリー'
 
-interface WordSet {
+export interface WordSet {
   /** 最初に押さえるワード（そのまま見せる） */
   start: string
   /** [問題文, 答え]。答えは前のワードから一文字だけ変えたもの */
   steps: [string, string][]
 }
 
-const WORD_GAMES: WordSet[] = [
+export const WORD_GAMES: WordSet[] = [
   {
     start: 'ブレンド',
     steps: [
@@ -81,7 +80,7 @@ const WORD_GAMES: WordSet[] = [
   },
 ]
 /** 画像の縦横比（public/BG/Stage3 の画像に合わせる） */
-const ASPECT: Record<1 | 2 | 3, string> = { 1: '740 / 505', 2: '746 / 505', 3: '742 / 466' }
+export const ASPECT: Record<1 | 2 | 3, string> = { 1: '740 / 505', 2: '746 / 505', 3: '742 / 466' }
 
 /** 文字ごとの数（並び順は問わない） */
 function bag(word: string): Map<string, number> {
@@ -127,7 +126,6 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
   // ---------- 会話とダイアログ ----------
   const [talk, setTalk] = useState<{ lines: Line[]; idx: number; then?: () => void } | null>(null)
   const [dialog, setDialog] = useState<{ texts: string[]; idx: number; then?: () => void } | null>(null)
-  const [mood, setMood] = useState(false)
   const [clearFx, setClearFx] = useState(false)
 
   // ルール説明（入り直したときも、説明が済んでいなければ最初から）
@@ -182,7 +180,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
   const [editing, setEditing] = useState(false)
 
   const line = talk?.lines[talk.idx]
-  const busy = !!talk || !!dialog || clearFx || mood
+  const busy = !!talk || !!dialog || clearFx
 
   let view: ReactNode
   if (editing && playing) {
@@ -248,11 +246,6 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
     <div className="word-game" ref={rootRef}>
       {view}
 
-      {!editing && word.step !== 'rule' && (
-        <button className="mood-heart word-heart" aria-label="カイ・メイのキモチ" onClick={() => setMood(true)}>
-          <span />
-        </button>
-      )}
 
       {debug && playing && !busy && (
         <button className="hide-edit-btn" onClick={() => setEditing((e) => !e)}>
@@ -268,7 +261,6 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         </div>
       )}
 
-      {mood && <MoodCard mood={ST3_MOOD} onClose={() => setMood(false)} />}
 
       {line &&
         overlay(
@@ -320,7 +312,7 @@ interface BoardProps {
  * ・変わらない文字の指が離れたら、最初のワードからやり直し
  * ?debug=true のときは、マウスのクリックで指を置く・外すを切り替えられる（Shift+クリックで同じ丸に2本目）
  */
-function WordBoard({ label, set, areas, image, aspect, debug, paused, onClear }: BoardProps) {
+export function WordBoard({ label, set, areas, image, aspect, debug, paused, onClear }: BoardProps) {
   const words = useMemo(() => [set.start, ...set.steps.map((s) => s[1])], [set])
   const stageRef = useRef<HTMLDivElement>(null)
   // ポインター → 乗っている丸の id（丸の外なら null）

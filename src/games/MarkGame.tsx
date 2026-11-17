@@ -20,20 +20,34 @@ const KEYS = [...DIGIT_KEYS, ...ACTION_KEYS] as const
 /** 入力できる最大桁数 */
 const MAX_DIGITS = 9
 
-/** 案内役のエルフの台詞。画面下のテキストボックスに出す */
+/** 案内役のエルフの台詞。画面下のテキストボックスに出す（wrong は複数の吹き出しを、タップで送る） */
 const GUIDE = {
-  start: 'マークを選んで得点を入力しよう。',
-  picking: 'マークを選んで得点を入力しよう。',
-  wrong: 'うーん、ちがうみたい。もう一度考えてみて！',
-  right: 'その調子！',
-  done: 'すべて分かったね！すごい！',
+  start: ['マークを選んで得点を入力しよう。'],
+  picking: ['マークを選んで得点を入力しよう。'],
+  // 1回目の不正解だけ
+  wrongFirst: [
+    'あの……大人の皆さんに言うのもアレなんですが……\n答えが違ってるところがありますよ……',
+    '本当は自己責任なゲームなんですからね。',
+    'うっかりミスでリンさんが楽しめないとマズいから、\nこっそり教えているんです。しっかりしてください。',
+  ],
+  wrong: ['もう一度考えてみましょう。'],
+  right: ['その調子！'],
+  done: ['すべて分かったね！すごい！'],
 } as const
 
-export default function MarkGame({ onClear }: GameProps) {
-  const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>({})
+const ALL_SOLVED = Object.fromEntries(MARKS.map((m) => [m.id, m.answer])) as Partial<Record<MarkId, number>>
+
+export default function MarkGame({ onClear, solved: allDone }: GameProps) {
+  const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : {})
   const [selected, setSelected] = useState<MarkId | null>(null)
   const [input, setInput] = useState('')
   const [guide, setGuide] = useState<keyof typeof GUIDE>('start')
+  const [guideIdx, setGuideIdx] = useState(0)
+  const missed = useRef(false)
+  const say = (g: keyof typeof GUIDE) => {
+    setGuide(g)
+    setGuideIdx(0)
+  }
   const cleared = useRef(false)
   const onClearRef = useRef(onClear)
   onClearRef.current = onClear
@@ -41,8 +55,8 @@ export default function MarkGame({ onClear }: GameProps) {
   const allSolved = MARKS.every((m) => solved[m.id] !== undefined)
 
   useEffect(() => {
-    if (!allSolved) return
-    setGuide('done')
+    if (!allSolved || allDone) return
+    say('done')
     const t = setTimeout(() => {
       if (cleared.current) return
       cleared.current = true
@@ -55,7 +69,7 @@ export default function MarkGame({ onClear }: GameProps) {
     if (solved[id] !== undefined) return
     setSelected(id)
     setInput('')
-    setGuide('picking')
+    say('picking')
   }
 
   const press = (key: (typeof KEYS)[number]) => {
@@ -72,14 +86,15 @@ export default function MarkGame({ onClear }: GameProps) {
       setSolved((s) => ({ ...s, [selected]: mark.answer }))
       setSelected(null)
       setInput('')
-      setGuide('right')
+      say('right')
     } else {
       setInput('')
-      setGuide('wrong')
+      say(missed.current ? 'wrong' : 'wrongFirst')
+      missed.current = true
     }
   }
 
-  const elfEmotion = guide === 'wrong' ? '哀' : guide === 'right' || guide === 'done' ? '喜' : '真顔'
+  const elfEmotion = guide === 'wrong' || guide === 'wrongFirst' ? '哀' : guide === 'right' || guide === 'done' ? '喜' : '真顔'
 
   return (
     <div className="game mark-game">
@@ -118,10 +133,19 @@ export default function MarkGame({ onClear }: GameProps) {
           </div>
         </div>
       </div>
-      <div className="mark-speak">
-        <img className="mark-speak-icon" src={characterImage('Common', elfEmotion)} alt="" />
-        <div className="mark-speak-box" key={guide}>{GUIDE[guide]}</div>
-      </div>
+      {/* すべて分かったあとは、続きの説明（画面の上に出る会話）に任せる */}
+      {!allDone && (
+        <div className="mark-speak">
+          <img className="mark-speak-icon" src={characterImage('Common', elfEmotion)} alt="" />
+          <div
+            className={`mark-speak-box${guideIdx + 1 < GUIDE[guide].length ? ' is-more' : ''}`}
+            key={`${guide}${guideIdx}`}
+            onClick={() => setGuideIdx((i) => Math.min(i + 1, GUIDE[guide].length - 1))}
+          >
+            {GUIDE[guide][guideIdx]}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -163,6 +163,7 @@ export default function NovelPart({
   })
 
   const happy = line.emotion === '喜' || line.emotion === '楽'
+  const prevSlide = idx > 0 ? scene.lines[idx - 1]?.slide : undefined
 
   return (
     <div className={`novel${skip ? ' skip' : ''}`} style={{ ['--lead' as string]: `${leadMs}ms` }} onClick={next}>
@@ -194,7 +195,12 @@ export default function NovelPart({
       />
       )}
 
-      {line.slide && <img key={`slide${idx}`} className="novel-slide" src={line.slide} alt="" />}
+      {line.slide ? (
+        <img key={`slide${idx}`} className="novel-slide" src={line.slide} alt="" />
+      ) : (
+        // 前の台詞で出ていた画像は、フェードで消す
+        prevSlide && <img key={`out${idx}`} className="novel-slide is-out" src={prevSlide} alt="" />
+      )}
 
       {!line.banner && !line.mood && <div className="novel-panel">
         <div className="novel-speaker">{line.speaker}</div>

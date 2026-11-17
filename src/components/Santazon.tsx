@@ -8,7 +8,11 @@ import {
   type Product,
 } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
+import { isBingoCart, roundOf, SURPRISE_KID_ORDER, SURPRISE_NAME } from '../games/bingoData'
+import { isLastCart, lastOrderGate } from '../games/lastData'
+import { LAST_STAGE } from '../config'
 import { characterImage } from '../scenario'
+import TenKey from './TenKey'
 import type { OrderItem, TeamDoc } from '../types'
 
 interface Props {
@@ -26,14 +30,54 @@ interface Props {
   guide?: SzGuide | null
   /** 正しい注文を確定する直前に呼ぶ。true を返すと注文しない（ステージ3の椅子の話） */
   onBeforeOrder?: () => boolean
+  /** 取り出し依頼（ステージ4から）。入れた番号で取り出せたか */
+  onRequest?: (code: string) => RequestResult
+  /** 届いた注文のナゾ（宅配ソックスのナゾ）をもう一度開く */
+  onOpenProblem?: () => void
 }
+
+/** ok=取り出せた / wrong=番号が違う / none=いま取り出せるものがない */
+export type RequestResult = 'ok' | 'wrong' | 'none'
+const REQUEST_MSG: Record<Exclude<RequestResult, 'ok'>, string> = {
+  wrong: 'その番号では取り出せないみたい。もう一度確かめてみよう。',
+  none: 'いま取り出せるアイテムはないみたい。',
+}
+
+/** Santazon の画像（public/BG/Common/santazon） */
+const SZ_DIR = `${import.meta.env.BASE_URL}BG/Common/santazon/`
+const SZ = {
+  backList: `${SZ_DIR}san_back 1.webp`,
+  backSearch: `${SZ_DIR}san_back2.webp`,
+  /** カテゴリのタブ。on=選んでいる（紫）/ off=灰色 */
+  cat: (k: string, on: boolean) => `${SZ_DIR}list_${k}${on ? 1 : 2}.webp`,
+  item: `${SZ_DIR}item1.webp`,
+  itemSurprise: `${SZ_DIR}item2.webp`,
+  detail: `${SZ_DIR}item3.webp`,
+  addCart: `${SZ_DIR}item4.webp`,
+  order: `${SZ_DIR}cart1.webp`,
+  shipped: `${SZ_DIR}cart2.webp`,
+  sockKey: `${SZ_DIR}cart3.webp`,
+  request: `${SZ_DIR}cart4.webp`,
+  num: (d: string) => `${SZ_DIR}num${d}.webp`,
+  numBox: `${SZ_DIR}num_box.webp`,
+}
+
+/** カテゴリのタブ。from=このステージから出す */
+const CAT_TABS: { key: CategoryKey; img: string; label: string; from: number }[] = [
+  { key: 'game1', img: 'a', label: '1st', from: 1 },
+  { key: 'game3', img: 'b', label: '3rd', from: 3 },
+  { key: 'game4', img: 'c', label: '4th', from: 4 },
+  { key: 'final', img: 'd', label: 'Last', from: LAST_STAGE },
+]
 
 export type SzTab = 'list' | 'search'
 /** tab=リスト追加検索タブを目立たせる / talk=説明中（どこも触れない） */
 export type SzGuide = 'tab' | 'talk'
 
-/** リスト追加検索で、検索済みリストに載せてよい商品 */
-const SEARCH_LIST_NAMES = new Set(['マネキン', 'セーター', 'オーバーオール', 'スーパーボール'])
+/** リスト追加検索で、検索済みリストに載せてよい商品（名前が一致するか、前方一致） */
+const SEARCH_LIST_NAMES = new Set(['マネキン', 'セーター', 'オーバーオール', 'スーパーボール', 'エントツ', '金庫'])
+const SEARCH_LIST_PREFIXES = ['サッカーボール']
+const canList = (name: string) => SEARCH_LIST_NAMES.has(name) || SEARCH_LIST_PREFIXES.some((x) => name.startsWith(x))
 
 function ProductImage({ p }: { p: Product }) {
   if (!p.image) return null
@@ -41,7 +85,7 @@ function ProductImage({ p }: { p: Product }) {
 }
 
 /** 注文画面「Santazon」。見た目はネット通販サイト風 */
-export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder }: Props) {
+export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem }: Props) {
   const { products } = useProducts()
   const productById = (id: string) => products.find((p) => p.id === id)
   const [ownTab, setOwnTab] = useState<SzTab>('list')
@@ -51,7 +95,9 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
     onTab?.(t)
   }
   // 初期値は現在のステージのカテゴリ。選び直したら、そちらを優先する
-  const stageCategory = CATEGORIES[Math.min(CATEGORIES.length, Math.max(1, doc.stage)) - 1].key
+  // LAST はファイナルゲーム用アイテムから
+  const isLast = doc.stage >= LAST_STAGE
+  const stageCategory: CategoryKey = isLast ? 'final' : doc.stage >= 4 ? 'game4' : doc.stage >= 3 ? 'game3' : 'game1'
   const [picked, setPicked] = useState<CategoryKey | null>(null)
   const category = picked ?? stageCategory
   const [showSearched, setShowSearched] = useState(false)
@@ -59,14 +105,23 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   const [help, setHelp] = useState(false)
   const [rejected, setRejected] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  // 注文を止めたときのメッセージ（真ん中の表示 → エルフ）
+  const [gate, setGate] = useState<{ center?: string; elf?: string } | null>(null)
+  const [requestMsg, setRequestMsg] = useState<string | null>(null)
 
   // 届く途中・解答中は新しい注文ができない。考え直す注文と、解き終わった注文は入れ直せる
   const ordering = !!doc.order && (doc.order.status === 'ordered' || doc.order.status === 'delivered')
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
   const full = cartCount >= MAX_CART
 
+  // ステージ4：サプライズアイテムは、ロビンがラウンドごとに注文している
+  const bingoRound = doc.stage === 4 ? roundOf(doc.bingo?.step) : null
+  const kidOrdered = (p: Product) =>
+    bingoRound && p.category === 'game4' && p.name === SURPRISE_NAME ? SURPRISE_KID_ORDER * (bingoRound === 'r1' ? 1 : 2) : 0
   const remaining = (p: Product) =>
     p.available -
+    kidOrdered(p) -
     (doc.orderedQty.find((i) => i.id === p.id)?.qty ?? 0) -
     (cart.find((i) => i.id === p.id)?.qty ?? 0)
 
@@ -78,11 +133,21 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
     )
   const dec = (id: string) =>
     setCart((c) => c.flatMap((i) => (i.id !== id ? [i] : i.qty > 1 ? [{ ...i, qty: i.qty - 1 }] : [])))
-  const remove = (id: string) => setCart((c) => c.filter((i) => i.id !== id))
 
   const confirm = () => {
     if (!cart.length || ordering) return
-    const correct = isCorrectCart(doc.stage, cart)
+    // LAST：宅配ソックスが埋まっている・見落としがあるなど、決まった注文だけ特別なメッセージで止める
+    const stop = isLast ? lastOrderGate(doc.last?.step, cart, products) : null
+    if (stop) {
+      setGate(stop)
+      return
+    }
+    const correct =
+      doc.stage === 4
+        ? isBingoCart(doc.bingo?.step, cart, products)
+        : isLast
+          ? isLastCart(doc.last?.step, cart, products)
+          : isCorrectCart(doc.stage, cart)
     if (correct) {
       if (onBeforeOrder?.()) return
       const orderedQty = [...doc.orderedQty]
@@ -100,9 +165,9 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
     }
   }
 
-  // ステージが進むほど、その番号までのゲーム用アイテムが選べる
-  const openCategories = CATEGORIES.slice(0, Math.min(CATEGORIES.length, Math.max(1, doc.stage)))
-  const selected = openCategories.some((c) => c.key === category) ? category : openCategories[openCategories.length - 1].key
+  // カテゴリのタブ（2nd・5th は商品がないので出さない）。ステージが進むほど増える
+  const tabs = CAT_TABS.filter((t) => doc.stage >= t.from)
+  const selected = tabs.some((t) => t.key === category) ? category : tabs[tabs.length - 1].key
   const listed = products.filter((p) => p.category === selected && p.listed)
   const searchedProducts = doc.searched.map(productById).filter((p): p is Product => !!p)
   const rows = showSearched ? searchedProducts : listed
@@ -110,120 +175,125 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
     setTab('list')
     setShowSearched(true)
   }
+  // カートは3枠。同じ商品を2つ入れたら2枠使う
+  const units = cart.flatMap((i) => Array.from({ length: i.qty }, () => i.id))
+  const delivered = doc.order?.status === 'delivered'
 
   return (
-    <div className={`santazon${guide ? ' is-guided' : ''}`}>
-      <header className="sz-header">
-        <button className="sz-home" onClick={onClose} aria-label="ホームに戻る">
-          <svg viewBox="0 0 24 24" width="44" height="44" fill="currentColor">
-            <path d="M12 3 2 12h3v8h5v-6h4v6h5v-8h3z" />
-          </svg>
-        </button>
-        <div className="sz-logo">Santazon</div>
-        <nav className="sz-tabs">
-          <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>リスト</button>
-          {searchUnlocked && (
-            <button
-              className={`${tab === 'search' ? 'on' : ''}${guide === 'tab' ? ' is-guide' : ''}`}
-              onClick={() => {
-                setTab('search')
-                setShowSearched(false)
-              }}
-            >
-              リスト追加検索
+    <div
+      className={`santazon is-${tab}${guide ? ' is-guided' : ''}`}
+      style={{ backgroundImage: `url("${tab === 'list' ? SZ.backList : SZ.backSearch}")` }}
+    >
+      <button className="sz-home" onClick={onClose} aria-label="ホームに戻る" />
+      <button className="sz-help" onClick={() => setHelp(true)}>？ 使い方</button>
+      <button className="sz-tab is-list" aria-label="リスト" onClick={() => setTab('list')} />
+      {searchUnlocked && (
+        <button
+          className={`sz-tab is-search${guide === 'tab' ? ' is-guide' : ''}`}
+          aria-label="リスト登録"
+          onClick={() => {
+            setTab('search')
+            setShowSearched(false)
+          }}
+        />
+      )}
+
+      {tab === 'list' ? (
+        <>
+          <nav className="sz-cats">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                className="sz-cat"
+                aria-label={t.label}
+                onClick={() => {
+                  setPicked(t.key)
+                  setShowSearched(false)
+                }}
+              >
+                <img src={SZ.cat(t.img, !showSearched && selected === t.key)} alt={t.label} draggable={false} />
+              </button>
+            ))}
+            <button className="sz-cat is-wide" aria-label="登録済みアイテム" onClick={openSearched}>
+              <img src={SZ.cat('e', showSearched)} alt="登録済みアイテム" draggable={false} />
             </button>
-          )}
-        </nav>
-        <button className="sz-btn sz-yellow sz-help" onClick={() => setHelp(true)}>Santazonの使い方</button>
-        <button className="sz-btn sz-yellow sz-top-btn" onClick={onClose}>トップに戻る</button>
-      </header>
+          </nav>
 
-      <div className="sz-body">
-        <main className="sz-main">
-          {tab === 'list' ? (
-            <>
-              <div className="sz-toolbar">
-                <select
-                  value={selected}
-                  onChange={(e) => {
-                    setPicked(e.target.value as CategoryKey)
-                    setShowSearched(false)
-                  }}
-                >
-                  {openCategories.map((c) => (
-                    <option key={c.key} value={c.key}>{c.label}</option>
-                  ))}
-                </select>
-                <button className={`sz-btn sz-light${showSearched ? ' is-on' : ''}`} onClick={openSearched}>
-                  検索済みリスト（{searchedProducts.length}）
-                </button>
-              </div>
-              <div className="sz-list">
-                {rows.length === 0 && (
-                  <div className="sz-empty">
-                    {showSearched ? 'まだ検索した商品はありません' : 'このカテゴリに掲載中の商品はありません'}
-                  </div>
-                )}
-                {rows.map((p) => {
-                  const left = remaining(p)
-                  const soldOut = left <= 0
-                  return (
-                    <div className={`sz-row${soldOut ? ' sold-out' : ''}`} key={p.id}>
-                      <div className="sz-name">{p.name}</div>
-                      <div className="sz-code">詳細番号：{formatCode(p.code)}</div>
-                      <button className="sz-btn sz-light" onClick={() => setDetail(p)}>詳細</button>
-                      <button className="sz-btn sz-yellow" disabled={soldOut || full || ordering} onClick={() => add(p)}>
-                        カートに追加
-                      </button>
-                      <div className="sz-stock">在庫数：{Math.max(0, left)}/{p.stock}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          ) : (
-            <SearchTab
-              products={products}
-              searched={doc.searched}
-              onFound={(ids) => {
-                const addIds = ids.filter((id) => {
-                  const p = productById(id)
-                  return !!p && SEARCH_LIST_NAMES.has(p.name) && !doc.searched.includes(id)
-                })
-                if (addIds.length) update({ searched: [...doc.searched, ...addIds] })
-              }}
-              onOpenSearched={openSearched}
-              guided={!!guide}
-            />
-          )}
-        </main>
-
-        <aside className="sz-cart">
-          <h2>ショッピングカート</h2>
-          <div className="sz-cart-count">{cartCount} / {MAX_CART} 点</div>
-          <div className="sz-cart-list">
-            {cart.length === 0 && <div className="sz-empty">カートは空です</div>}
-            {cart.map((i) => {
-              const p = productById(i.id)
-              if (!p) return null
+          <div className="sz-list">
+            {rows.length === 0 && (
+              <div className="sz-empty">{showSearched ? 'まだ登録したアイテムはありません' : 'このカテゴリに掲載中の商品はありません'}</div>
+            )}
+            {rows.map((p) => {
+              const left = remaining(p)
+              const soldOut = left <= 0
+              const surprise = p.name === SURPRISE_NAME
               return (
-                <div className="sz-cart-item" key={i.id}>
-                  <div className="sz-cart-info">
-                    <div className="sz-name">{p.name} × {i.qty}</div>
+                <div
+                  className={`sz-item${soldOut ? ' sold-out' : ''}${surprise ? ' is-surprise' : ''}`}
+                  key={p.id}
+                  style={{ backgroundImage: `url("${surprise ? SZ.itemSurprise : SZ.item}")` }}
+                >
+                  {/* サプライズアイテムは、名前が画像に入っている */}
+                  <div className="sz-item-name" style={surprise ? { visibility: 'hidden' } : undefined}>
+                    <b>{p.name}</b>
+                    <small>{formatCode(p.code)}</small>
                   </div>
-                  <button className="sz-btn sz-light sz-sm" onClick={() => dec(i.id)} aria-label="1つ減らす">−</button>
-                  <button className="sz-btn sz-light sz-sm" onClick={() => remove(i.id)}>削除</button>
+                  <button className="sz-item-btn is-detail" aria-label="詳細" onClick={() => setDetail(p)}>
+                    <img src={SZ.detail} alt="" draggable={false} />
+                  </button>
+                  <button className="sz-item-btn is-cart" aria-label="カートに追加" disabled={soldOut || full || ordering} onClick={() => add(p)}>
+                    <img src={SZ.addCart} alt="" draggable={false} />
+                  </button>
+                  <div className="sz-item-stock">
+                    {Math.max(0, left)}/{p.stock}
+                  </div>
                 </div>
               )
             })}
           </div>
-          {full && !ordering && <div className="sz-note">カートに入れられるのは{MAX_CART}つまでです</div>}
-          {ordering && <div className="sz-note">配送中のため、新しい注文はできません</div>}
-          <button className="sz-btn sz-orange sz-confirm" disabled={!cart.length || ordering} onClick={confirm}>
-            注文確定
-          </button>
-        </aside>
-      </div>
+
+          <aside className="sz-cart">
+            {Array.from({ length: MAX_CART }, (_, i) => {
+              const p = units[i] ? productById(units[i]) : undefined
+              return (
+                <div className="sz-cart-slot" key={i}>
+                  {p && (
+                    <>
+                      <span>{p.name}</span>
+                      <button aria-label="カートから外す" onClick={() => dec(p.id)}>✕</button>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+            <button className="sz-order" disabled={!cart.length || ordering} onClick={confirm} aria-label={ordering ? '発送済み' : '注文する'}>
+              <img src={ordering ? SZ.shipped : SZ.order} alt="" draggable={false} />
+            </button>
+            <button className="sz-side-btn is-sock" disabled={!delivered || !onOpenProblem} onClick={onOpenProblem} aria-label="ソックスキーを導く">
+              <img src={SZ.sockKey} alt="" draggable={false} />
+            </button>
+            {onRequest && (
+              <button className="sz-side-btn is-request" onClick={() => setRequesting(true)} aria-label="エルフに取り出し依頼">
+                <img src={SZ.request} alt="" draggable={false} />
+              </button>
+            )}
+          </aside>
+        </>
+      ) : (
+        <SearchTab
+          products={products}
+          searched={doc.searched}
+          onFound={(ids) => {
+            const addIds = ids.filter((id) => {
+              const p = productById(id)
+              return !!p && canList(p.name) && !doc.searched.includes(id)
+            })
+            if (addIds.length) update({ searched: [...doc.searched, ...addIds] })
+          }}
+          onOpenSearched={openSearched}
+          guided={!!guide}
+        />
+      )}
 
       {detail && (
         <div className="sz-dialog-back" onClick={() => setDetail(null)}>
@@ -258,6 +328,57 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
             <p>
               <span>エルフ</span>
               注文するものをもう一度考えた方がよさそうだね。
+            </p>
+          </div>
+        </div>
+      )}
+
+      {requesting && onRequest && (
+        <div className="sz-dialog-back" onClick={() => setRequesting(false)}>
+          <div className="sz-dialog sz-request-dialog" onClick={(e) => e.stopPropagation()}>
+            <button className="sz-close" onClick={() => setRequesting(false)} aria-label="閉じる">✕</button>
+            <h2>取り出し依頼</h2>
+            <p>キーボックスの番号（4桁）を入力してください。</p>
+            <TenKey
+              length={4}
+              okLabel="依頼"
+              onSubmit={(code) => {
+                const r = onRequest(code)
+                if (r === 'ok') setRequesting(false)
+                else setRequestMsg(REQUEST_MSG[r])
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {gate?.center && (
+        <div className="sz-dialog-back" onClick={() => setGate({ elf: gate.elf })}>
+          <div className="sz-dialog sz-gate" onClick={(e) => e.stopPropagation()}>
+            <p>{gate.center}</p>
+            <button className="sz-btn sz-yellow" onClick={() => setGate({ elf: gate.elf })}>閉じる</button>
+          </div>
+        </div>
+      )}
+      {gate && !gate.center && gate.elf && (
+        <div className="sz-elf-back" onClick={() => setGate(null)}>
+          <div className="sz-elf-line">
+            <img src={characterImage('Common', '真顔')} alt="" />
+            <p className="is-pre">
+              <span>エルフ</span>
+              {gate.elf}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {requestMsg && (
+        <div className="sz-elf-back" onClick={() => setRequestMsg(null)}>
+          <div className="sz-elf-line">
+            <img src={characterImage('Common', '真顔')} alt="" />
+            <p>
+              <span>エルフ</span>
+              {requestMsg}
             </p>
           </div>
         </div>
@@ -375,10 +496,11 @@ function SearchTab({
       <p className="sz-search-lead">
         商品を指定するとアイテムをリストに追加できます。
         <br />
-        一度検索したものは検索済みリストから確認できます。
+        一度登録したものは「登録済みアイテム」から確認できます。
       </p>
-      <button className="sz-btn sz-light sz-sm sz-search-list" onClick={onOpenSearched}>
-        検索済みリスト（{searched.length}）
+      <button className="sz-search-list" onClick={onOpenSearched} aria-label={`登録済みアイテム（${searched.length}）`}>
+        <img src={SZ.cat('e', false)} alt="" draggable={false} />
+        <span>{searched.length}</span>
       </button>
 
       <div className="sz-slots">
@@ -386,11 +508,12 @@ function SearchTab({
           <div key={i} className="sz-slot-wrap">
             {i > 0 && <span className="sz-dash">ー</span>}
             <div
-              className={`sz-slot${v ? ' filled' : ''}`}
+              className={`sz-slot${v ? ' filled' : ''}${v && !DIGITS.includes(v) ? ' is-char' : ''}`}
               data-slot={i}
+              style={{ backgroundImage: `url("${v && DIGITS.includes(v) ? SZ.num(v) : SZ.numBox}")` }}
               onClick={() => setSlots((s) => s.map((x, j) => (j === i ? null : x)))}
             >
-              {v}
+              {v && !DIGITS.includes(v) ? v : ''}
             </div>
           </div>
         ))}
@@ -421,8 +544,9 @@ function SearchTab({
           <button
             key={d}
             className="sz-panel"
+            aria-label={d}
             onPointerDown={down(d)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-            {d}
+            <img src={SZ.num(d)} alt="" draggable={false} />
           </button>
         ))}
       </div>
@@ -452,8 +576,8 @@ function SearchTab({
       </p>
 
       {drag && (
-        <div className={`sz-panel sz-ghost${DIGITS.includes(drag.digit) ? '' : ' is-char'}`} style={{ left: drag.x - 55, top: drag.y - 55 }}>
-          {drag.digit}
+        <div className={`sz-panel sz-ghost${DIGITS.includes(drag.digit) ? '' : ' is-char'}`} style={{ left: drag.x - 77, top: drag.y - 77 }}>
+          {DIGITS.includes(drag.digit) ? <img src={SZ.num(drag.digit)} alt="" /> : drag.digit}
         </div>
       )}
     </div>

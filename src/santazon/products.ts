@@ -51,6 +51,7 @@ export const PRODUCTS: Product[] = [
   p('game1', 3, 'わなげ用リング', '1864', 0, true),
   p('game1', 4, 'クリスマスリース', '1839', 1, true),
   p('game1', 5, 'フラフープ', '2453', 1, true, '', '1で発送'),
+  p('game1', 6, 'ユビワ×1', '1717', 1, true, '', '4のROUND2で発送'),
   p('game2', 1, 'マネキン', '2222', 0, false),
   p('game2', 2, 'セーター', '2323', 0, false),
   p('game2', 3, 'オーバーオール', '1678', 0, false),
@@ -63,7 +64,11 @@ export const PRODUCTS: Product[] = [
   p('game4', 3, 'ジグソーパズル1箱', '1745', 1, true),
   p('game4', 4, 'シャンパン1本', '2129', 1, true),
   p('game4', 5, 'ポインセチア5鉢', '1418', 1, true),
-  p('game4', 6, 'サッカーボール7個', '2002', 5, false, '', 'ファイナル1'),
+  p('game4', 6, 'サッカーボール7個', '2002', 5, false, '', 'ファイナル1・4のROUND2で発送'),
+  p('game4', 7, 'サプライズアイテム', '1998', 99, true, '何が届くかお楽しみ', 'ロビンがラウンドごとに3つ注文している'),
+  p('game4', 8, 'グラス×3', '1531', 1, true, '', '4のROUND1で発送'),
+  p('game4', 9, 'マッチ×3', '1642', 1, true, '', '4のROUND1で発送'),
+  p('game4', 10, 'ハンカチ×1', '1753', 1, true, '', '4のROUND1で発送'),
   p('final', 1, 'レッドボール2個', '1020', 0, true, '直径10cmのボール', 'ファイナル2'),
   p('final', 2, 'ブルーボール2個', '0204', 0, true, '直径10cmのボール', 'ファイナル2'),
   p('final', 3, 'イエローボール2個', '2382', 1, true, '直径10cmのボール', 'ファイナル3'),
@@ -73,6 +78,7 @@ export const PRODUCTS: Product[] = [
   p('final', 7, '金庫', '0025', 5, false, '', 'ファイナル4'),
   p('final', 8, 'スーパーボール', '1200', 1, false, '', 'ファイナル4'),
   p('final', 9, 'サプライズアイテム', '1999', 1, false),
+  p('final', 10, 'バスケットボール7個セット', '1707', 3, true, '', 'LASTで3セット注文する（宅配ソックスが埋まっていて発送できない）'),
 ]
 
 export const productById = (id: string): Product | undefined => PRODUCTS.find((x) => x.id === id)
@@ -89,7 +95,7 @@ export interface Problem {
 }
 
 export const PROBLEMS: Record<CategoryKey, Problem> = {
-  game1: { answer: 'タンバリン', code: '1111' },
+  game1: { answer: '1111', code: '1111' },
   game2: { answer: '1234', code: '1234' },
   game3: { answer: '1234', code: '3333' },
   game4: { answer: '1234', code: '1234' },
@@ -130,5 +136,5 @@ export function isCorrectCart(stage: number, items: { id: string; qty: number }[
   return stage === 3 ? isStage3Cart(items) : isGame1LoseCart(items)
 }
 
-/** 正しい注文が届いて正解したら、エルフが番号を出し、待ってから次のステージへ進むステージ */
-export const ORDER_STAGES = [1, 3]
+/** 正しい注文が届いて正解したら、エルフが番号を出し、待ってから次のステージへ進むステージ（5は LAST） */
+export const ORDER_STAGES = [1, 3, 5]

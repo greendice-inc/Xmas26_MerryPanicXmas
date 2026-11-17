@@ -1,55 +1,9 @@
 import { useRef, useState } from 'react'
+import TenKey from './TenKey'
 import { PROBLEMS } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { characterImage } from '../scenario'
 import type { Order } from '../types'
-
-/** 横長の五十音。右からあかさたなはまやらわん。段は上からあいうえお。わは上、をはその列の一番下 */
-const KANA_GRID: (string | null)[][] = [
-  ['ん', 'わ', 'ら', 'や', 'ま', 'は', 'な', 'た', 'さ', 'か', 'あ'],
-  [null, null, 'り', null, 'み', 'ひ', 'に', 'ち', 'し', 'き', 'い'],
-  [null, null, 'る', 'ゆ', 'む', 'ふ', 'ぬ', 'つ', 'す', 'く', 'う'],
-  [null, null, 'れ', null, 'め', 'へ', 'ね', 'て', 'せ', 'け', 'え'],
-  [null, 'を', 'ろ', 'よ', 'も', 'ほ', 'の', 'と', 'そ', 'こ', 'お'],
-]
-
-/** 押すたびに 小 → ゛ → ゜ → 元 の順で最後の文字を送る */
-const KANA_CYCLES: string[][] = [
-  ['あ', 'ぁ'], ['い', 'ぃ'], ['う', 'ぅ', 'ゔ'], ['え', 'ぇ'], ['お', 'ぉ'],
-  ['か', 'が'], ['き', 'ぎ'], ['く', 'ぐ'], ['け', 'げ'], ['こ', 'ご'],
-  ['さ', 'ざ'], ['し', 'じ'], ['す', 'ず'], ['せ', 'ぜ'], ['そ', 'ぞ'],
-  ['た', 'だ'], ['ち', 'ぢ'], ['つ', 'っ', 'づ'], ['て', 'で'], ['と', 'ど'],
-  ['は', 'ば', 'ぱ'], ['ひ', 'び', 'ぴ'], ['ふ', 'ぶ', 'ぷ'], ['へ', 'べ', 'ぺ'], ['ほ', 'ぼ', 'ぽ'],
-  ['や', 'ゃ'], ['ゆ', 'ゅ'], ['よ', 'ょ'], ['わ', 'ゎ'],
-]
-const SMALL = new Set('ぁぃぅぇぉゃゅょっゎ')
-const DAKU = new Set('がぎぐげござじずぜぞだぢづでどばびぶべぼゔ')
-const HAN = new Set('ぱぴぷぺぽ')
-
-function cycleLast(value: string) {
-  if (!value) return value
-  const last = value.slice(-1)
-  const seq = KANA_CYCLES.find((s) => s.includes(last))
-  if (!seq) return value
-  const next = seq[(seq.indexOf(last) + 1) % seq.length]
-  return value.slice(0, -1) + next
-}
-
-/** カタカナで書かれた解答も、ひらがな入力と揃えて比べる */
-function kanaKey(s: string) {
-  return s.trim().replace(/[\u30a1-\u30f6]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
-}
-function nextMark(value: string): 'small' | 'daku' | 'han' | null {
-  if (!value) return null
-  const last = value.slice(-1)
-  const seq = KANA_CYCLES.find((s) => s.includes(last))
-  if (!seq) return null
-  const next = seq[(seq.indexOf(last) + 1) % seq.length]
-  if (SMALL.has(next)) return 'small'
-  if (DAKU.has(next)) return 'daku'
-  if (HAN.has(next)) return 'han'
-  return null
-}
 
 function ProblemVisual({ src, onZoom }: { src?: string; onZoom: () => void }) {
   return (
@@ -127,95 +81,69 @@ function DeliveryScene() {
   )
 }
 
-/** 注文した商品が届いたときに出る問題。正解すると onSolved が呼ばれる */
-export default function ProblemDialog({ order, onSolved, onClose }: { order: Order; onSolved: () => void; onClose: () => void }) {
-  const [value, setValue] = useState('')
+/**
+ * 注文した商品が届いたときの通知。タップで閉じる。
+ * ナゾは、このあと「ソックスキーを導く」ボタンから開く
+ */
+export function ArrivalNotice({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="sz-dialog-back sz-top">
+      <button className="problem-arrive" onClick={onClose}>
+        <DeliveryScene />
+        <span className="arrive-text">アイテムが届きました。</span>
+        <span className="arrive-hint">タップしてとじる</span>
+      </button>
+    </div>
+  )
+}
+
+/** 宅配ソックスのナゾ（ソックスキーを導く）。正解すると onSolved が呼ばれる */
+export default function ProblemDialog({
+  order,
+  problem: given,
+  onSolved,
+  onClose,
+}: {
+  order: Order
+  /** 注文の中身ではなく、ステージで決まる問題（ステージ4のラウンドごと） */
+  problem?: { image?: string; answer: string; request?: boolean }
+  onSolved: () => void
+  onClose: () => void
+}) {
   const [wrong, setWrong] = useState(0)
   const [zoom, setZoom] = useState(false)
-  const [opened, setOpened] = useState(false)
   const clearing = useRef(false)
 
   const { products } = useProducts()
   const first = products.find((p) => p.id === (order.items[0]?.id ?? ''))
-  const problem = first ? PROBLEMS[first.category] : undefined
+  const problem = given ?? (first ? PROBLEMS[first.category] : undefined)
   const solved = order.status === 'solved'
-  const kana = !!problem && !/^\d+$/.test(problem.answer)
-  const mark = nextMark(value)
+  /** 答えはここでは入れず、Santazon の取り出し依頼ボタンで入れる */
+  const request = !!given?.request
 
-  const submit = () => {
+  const submit = (value: string) => {
     if (!problem || clearing.current) return
-    if (kanaKey(value) === kanaKey(problem.answer)) {
+    if (value === problem.answer.trim()) {
       clearing.current = true
       onSolved()
     } else setWrong((n) => n + 1)
   }
 
-  if (!solved && !opened) {
-    return (
-      <div className="sz-dialog-back sz-top">
-        <button className="problem-arrive" onClick={() => setOpened(true)}>
-          <DeliveryScene />
-          <span className="arrive-text">アイテムが届きました。</span>
-          <span className="arrive-hint">タップしてひらく</span>
-        </button>
-        <button className="sz-close" onClick={onClose} aria-label="閉じる">✕</button>
-      </div>
-    )
-  }
-
   return (
     <div className="sz-dialog-back sz-top">
-      <div className={`sz-dialog sz-problem${kana ? ' is-kana' : ''}`}>
+      <div className="sz-dialog sz-problem">
         {!solved && (
           <button className="sz-close" onClick={onClose} aria-label="閉じる">✕</button>
         )}
         <h2 className="problem-title">宅配ソックスを開けるためにナゾを解こう。</h2>
-        {kana ? (
-              <>
-                <div className="problem-top">
-                  <ProblemVisual src={problem?.image} onZoom={() => setZoom(true)} />
-                  <div className="problem-answer">
-                    <div className="kana-entry">{value || ' '}</div>
-                  </div>
-                </div>
-                <div className="kana-pad">
-                  {KANA_GRID.map((row, r) =>
-                    row.map((ch, c) =>
-                      ch ? (
-                        <button
-                          key={ch}
-                          className="kana-key"
-                          style={{ gridRow: r + 1, gridColumn: c + 1 }}
-                          onClick={() => setValue((v) => (v.length >= 10 ? v : v + ch))}
-                        >
-                          {ch}
-                        </button>
-                      ) : null,
-                    ),
-                  )}
-                  <button className="kana-cycle" style={{ gridRow: 1, gridColumn: 12 }} onClick={() => setValue(cycleLast)} aria-label="小字・濁点・半濁点">
-                    <span className={mark === 'small' ? 'is-on' : ''}>小字</span>
-                    <span className={mark === 'daku' ? 'is-on' : ''}>゛</span>
-                    <span className={mark === 'han' ? 'is-on' : ''}>゜</span>
-                  </button>
-                  <button className="kana-side" style={{ gridRow: 2, gridColumn: 12 }} onClick={() => setValue((v) => v.slice(0, -1))} aria-label="バックスペース">⌫</button>
-                  <button className="kana-side is-ok" style={{ gridRow: '3 / span 3', gridColumn: 12 }} disabled={!value} onClick={submit}>OK</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <ProblemVisual src={problem?.image} onZoom={() => setZoom(true)} />
-                <div className="sz-answer">
-                  <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submit()}
-                    placeholder="数字を入力"
-                  />
-                  <button className="sz-btn sz-yellow" onClick={submit}>確定</button>
-                </div>
-              </>
-            )}
+        <div className={`problem-body${request ? ' is-request' : ''}`}>
+          <ProblemVisual src={problem?.image} onZoom={() => setZoom(true)} />
+          {request ? (
+            <div className="problem-request">取り出し依頼ボタンで解答しよう。</div>
+          ) : (
+            <TenKey length={Math.max(1, problem?.answer.trim().length ?? 4)} onSubmit={submit} />
+          )}
+        </div>
       </div>
       {wrong > 0 && (
         <div className="sz-elf-back" onClick={() => setWrong(0)}>
