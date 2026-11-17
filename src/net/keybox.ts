@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { getBackend } from './index'
 
 /**
@@ -24,18 +24,46 @@ export interface KeyboxLinkDoc {
 const COL = 'keybox'
 export const LINK_ID = 'link'
 
+/** 指令を書き込めなかったか（Firestore のルール未反映・オフラインなど） */
+let failed = false
+const failListeners = new Set<() => void>()
+function setFailed(v: boolean) {
+  if (failed === v) return
+  failed = v
+  failListeners.forEach((l) => l())
+}
+export function useKeyboxSendFailed(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      failListeners.add(cb)
+      return () => failListeners.delete(cb)
+    },
+    () => failed,
+  )
+}
+
+function write(id: string, data: Record<string, unknown>) {
+  return getBackend()
+    .set(COL, id, data)
+    .then(() => setFailed(false))
+    .catch((e) => {
+      console.error('キーボックスへの指令を書き込めません', e)
+      setFailed(true)
+    })
+}
+
 export function setKeyboxRinging(id: number, ringing: boolean) {
-  return getBackend().set(COL, String(id), { ringing, updatedAt: Date.now() }).catch(() => {})
+  return write(String(id), { ringing, updatedAt: Date.now() })
 }
 
 export function requestKeyboxUnlock(id: number) {
   const now = Date.now()
-  return getBackend().set(COL, String(id), { unlockAt: now, updatedAt: now }).catch(() => {})
+  return write(String(id), { unlockAt: now, updatedAt: now })
 }
 
 export function requestKeyboxLock(id: number) {
   const now = Date.now()
-  return getBackend().set(COL, String(id), { lockAt: now, updatedAt: now }).catch(() => {})
+  return write(String(id), { lockAt: now, updatedAt: now })
 }
 
 export function setKeyboxLink(connected: boolean) {

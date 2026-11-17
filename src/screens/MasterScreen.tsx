@@ -5,7 +5,7 @@ import { KEYBOX_ADDR, KEYBOX_COUNT, ROOM_BY_TEAM, TEAM_COUNT } from '../config'
 import { toHex2 } from '../keybox/protocol'
 import { useKeyboxLink } from '../keybox/useKeyboxLink'
 import { getBackend } from '../net'
-import { requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll } from '../net/keybox'
+import { requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
 import { DEFAULT_TEAM, progressLabel } from '../types'
 import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
 
@@ -15,6 +15,7 @@ export default function MasterScreen() {
   const now = useNow()
   const keyboxes = useKeyboxAll()
   const link = useKeyboxLink(keyboxes)
+  const sendFailed = useKeyboxSendFailed()
   const row = (key: string, label: string, extra?: React.ReactNode) => (
     <div className="conn-item" key={key}>
       <ConnDot on={isOnline(all[key], now)} />
@@ -81,6 +82,7 @@ export default function MasterScreen() {
           ) : (
             <button disabled={!link.supported} onClick={link.connect}>アンテナに接続</button>
           )}
+          {sendFailed && <span className="warn">指令を書き込めません（Firestoreのルールを確認）</span>}
           {!link.supported && <span className="warn">このブラウザは Web Serial に未対応です（Chrome / Edge を使用）</span>}
         </div>
         <div className="conn-grid">

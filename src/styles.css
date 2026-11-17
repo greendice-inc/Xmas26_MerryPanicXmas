@@ -191,7 +191,7 @@ button.order-ready { margin: 0; width: 156px; font-size: 24px; padding: 6px 0; b
 .stay-count.is-held { color: var(--red); }
 .status-bar {
   position: absolute; left: 0; right: 0; bottom: 0; height: 80px; background: #fff; border-top: 3px solid var(--line);
-  display: flex; align-items: center; gap: 60px; padding: 0 70px; font-size: 28px; color: var(--ink-sub); white-space: nowrap;
+  display: flex; align-items: center; gap: 36px; padding: 0 70px; font-size: 28px; color: var(--ink-sub); white-space: nowrap;
 }
 .status-bar .dot { width: 22px; height: 22px; margin-right: 8px; }
 

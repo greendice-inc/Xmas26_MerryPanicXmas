@@ -246,21 +246,21 @@ export function useKeyboxLink(docs: Record<string, KeyboxDoc>) {
   )
 
   // ---------- スタッフ・プレイヤーからの指令 ----------
-  // 解錠・施錠：時刻が変わったら1回だけ送る。マスターを開く前の古い指令は送らない
-  const handled = useRef<Record<string, { unlockAt?: number; lockAt?: number }> | null>(null)
+  // 解錠・施錠：時刻が変わったら1回だけ送る。マスターを開く前の古い指令（30秒より前）は送らない
+  const mountedAt = useRef(Date.now())
+  const handled = useRef<Record<string, { unlockAt?: number; lockAt?: number }>>({})
   useEffect(() => {
-    const first = handled.current === null
-    if (first) handled.current = {}
+    const fresh = (t?: number) => !!t && t > mountedAt.current - 30000
     for (const [key, d] of Object.entries(docs)) {
       const id = Number(key)
       const addr = KEYBOX_ADDR[id]
       if (addr === undefined) continue
-      const h = (handled.current![key] ??= {})
-      if (!first && d.unlockAt && d.unlockAt !== h.unlockAt) {
+      const h = (handled.current[key] ??= {})
+      if (d.unlockAt !== h.unlockAt && fresh(d.unlockAt)) {
         push(`キーボックス${id}：解錠の指令`)
         unlock(addr)
       }
-      if (!first && d.lockAt && d.lockAt !== h.lockAt) {
+      if (d.lockAt !== h.lockAt && fresh(d.lockAt)) {
         push(`キーボックス${id}：施錠の指令`)
         send(addr, CMD.lock)
       }

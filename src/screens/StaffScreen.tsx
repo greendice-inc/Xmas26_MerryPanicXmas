@@ -5,7 +5,7 @@ import TwoTapButton from '../components/TwoTapButton'
 import { KEYBOX_COUNT, TEAM_COUNT } from '../config'
 import { getBackend } from '../net'
 import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
-import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll } from '../net/keybox'
+import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
 import { isGame1LoseCart } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { DEFAULT_TEAM, progressLabel } from '../types'
@@ -33,8 +33,12 @@ export default function StaffScreen() {
   const keyboxes = useKeyboxAll()
   // 下のバーで操作するキーボックス（1か2を切り替える）
   const [boxId, setBoxId] = useState(1)
+  const sendFailed = useKeyboxSendFailed()
   const boxRinging = !!keyboxes[String(boxId)]?.ringing
   const now = useNow()
+  // マスターが生きていて、そのUSBアンテナがつながっているときだけ、キーボックスに指令が届く
+  const masterOn = isOnline(presence['master'], now)
+  const antennaOn = masterOn && !!keyboxes[LINK_ID]?.connected
   const [online, setOnline] = useState(navigator.onLine)
   useEffect(() => {
     const on = () => setOnline(true)
@@ -141,7 +145,7 @@ export default function StaffScreen() {
         })}
       </div>
       <div className="keybox-bar">
-        <span className="keybox-bar-title"><ConnDot on={!!keyboxes[LINK_ID]?.connected && isOnline(presence['master'], now)} /> キーボックス</span>
+        <span className="keybox-bar-title">キーボックス</span>
         <div className="keybox-pick">
           {Array.from({ length: KEYBOX_COUNT }, (_, i) => {
             const id = i + 1
@@ -157,11 +161,14 @@ export default function StaffScreen() {
         </button>
         <button className="keybox-act" onClick={() => requestKeyboxUnlock(boxId)}>開ける</button>
         <button className="keybox-act sub" onClick={() => requestKeyboxLock(boxId)}>施錠する</button>
+        {sendFailed && <span className="warn">指令を送れませんでした</span>}
       </div>
       <div className="status-bar">
         <span><ConnDot on={online} /> ネットワーク: {online ? 'オンライン' : 'オフライン'}</span>
         <span>データ通信: {getBackend().kind === 'firestore' ? 'Firestore' : 'ローカル（テスト）'}</span>
         <span>スタッフ接続: <ConnDot on={isOnline(presence['staff'], now)} /></span>
+        <span>マスター接続: <ConnDot on={masterOn} /></span>
+        <span>USBアンテナ: <ConnDot on={antennaOn} /></span>
       </div>
     </div>
   )
