@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { KEYBOX_ADDR, KEYBOX_CODES, KEYBOX_INPUT_RESET_MS, KEYBOX_RELOCK_MS } from '../config'
+import { KEYBOX_CODES, KEYBOX_INPUT_RESET_MS, KEYBOX_RELOCK_MS } from '../config'
 import { setKeyboxLink, type KeyboxDoc } from '../net/keybox'
 import { buildMessage, CMD, KEY_MAP, parseLine, toHex2 } from './protocol'
 
@@ -12,21 +12,23 @@ export interface LogLine {
 /** 連続で送ると取りこぼすので、0.1秒ずつ間をあける */
 const SEND_GAP_MS = 100
 /** 鳴らし続けるときの「ピッ」の間隔と、1回ごとの休み */
-const RING_KEY_GAP_MS = 350
-const RING_REST_MS = 1800
+const RING_KEY_GAP_MS = 700
+const RING_REST_MS = 3000
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-const idByAddr = (addr: number) => {
-  const hit = Object.entries(KEYBOX_ADDR).find(([, a]) => a === addr)
-  return hit ? Number(hit[0]) : null
-}
 
 /**
  * マスター PC の USB アンテナ（Web Serial）でキーボックスとやり取りする。
  * ボタンの報告を受けて番号を判定し、スタッフ・プレイヤーからの指令（keybox コレクション）を送る
  */
-export function useKeyboxLink(docs: Record<string, KeyboxDoc>) {
+export function useKeyboxLink(docs: Record<string, KeyboxDoc>, addrs: Record<number, number>) {
+  // 設定が変わっても、動いている処理は最新の ad を見る
+  const addrsRef = useRef(addrs)
+  addrsRef.current = addrs
+  const idByAddr = (addr: number) => {
+    const hit = Object.entries(addrsRef.current).find(([, a]) => a === addr)
+    return hit ? Number(hit[0]) : null
+  }
   const [connected, setConnected] = useState(false)
   const [log, setLog] = useState<LogLine[]>([])
   const [inputs, setInputs] = useState<Record<number, string>>({})
@@ -253,7 +255,7 @@ export function useKeyboxLink(docs: Record<string, KeyboxDoc>) {
     const fresh = (t?: number) => !!t && t > mountedAt.current - 30000
     for (const [key, d] of Object.entries(docs)) {
       const id = Number(key)
-      const addr = KEYBOX_ADDR[id]
+      const addr = addrsRef.current[id]
       if (addr === undefined) continue
       const h = (handled.current[key] ??= {})
       if (d.unlockAt !== h.unlockAt && fresh(d.unlockAt)) {
@@ -273,7 +275,7 @@ export function useKeyboxLink(docs: Record<string, KeyboxDoc>) {
   const ringing = useRef<Record<number, boolean>>({})
   const looping = useRef<Record<number, boolean>>({})
   useEffect(() => {
-    for (const [key, addr] of Object.entries(KEYBOX_ADDR)) {
+    for (const key of Object.keys(addrsRef.current)) {
       const id = Number(key)
       const on = !!docs[key]?.ringing
       ringing.current[id] = on
@@ -287,11 +289,11 @@ export function useKeyboxLink(docs: Record<string, KeyboxDoc>) {
             continue
           }
           for (let i = 0; i < 4 && ringing.current[id]; i++) {
-            send(addr, CMD.beep)
+            send(addrsRef.current[id], CMD.beepOnly)
             await sleep(RING_KEY_GAP_MS)
           }
           if (!ringing.current[id]) break
-          send(addr, CMD.wrong)
+          send(addrsRef.current[id], CMD.wrongOnly)
           await sleep(RING_REST_MS)
         }
         looping.current[id] = false

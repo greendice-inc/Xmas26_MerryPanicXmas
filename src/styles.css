@@ -238,6 +238,7 @@ button.keybox-ring.is-on { animation: guide-glow .7s ease-in-out infinite altern
   display: flex; align-items: center; gap: 24px; padding: 0 70px; white-space: nowrap;
 }
 .keybox-bar-title { display: flex; align-items: center; gap: 8px; font-size: 30px; font-weight: 900; margin-right: 12px; }
+.keybox-ad { font-size: 22px; color: var(--ink-sub); font-family: ui-monospace, monospace; }
 .keybox-bar .dot { width: 22px; height: 22px; }
 .keybox-pick { display: flex; gap: 0; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 4px #cfcfd4; }
 button.keybox-tab { margin: 0; border-radius: 0; box-shadow: none; background: #fff; color: var(--ink-sub); font-size: 30px; padding: 12px 36px; }
@@ -1183,3 +1184,16 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
 /* 再生 */
 .script-preview { position: fixed; inset: 0; z-index: 100; }
 .catalog-page button.script-preview-close { position: fixed; right: 20px; top: 20px; z-index: 101; padding: 12px 24px; font-size: 18px; }
+
+/* キーボックステスト：ID・ch・ad の設定表 */
+.kb-settings { border-collapse: collapse; font-size: 26px; }
+.kb-settings th { text-align: left; font-size: 20px; color: var(--ink-sub); font-weight: 700; padding: 4px 18px 8px 0; white-space: nowrap; }
+.kb-settings td { padding: 6px 18px 6px 0; white-space: nowrap; }
+.kb-settings tr.is-sel td { color: var(--red); font-weight: 900; }
+.kb-settings input[type='radio'] { width: 26px; height: 26px; }
+.kb-settings input:not([type='radio']) { font-family: ui-monospace, monospace; font-size: 26px; padding: 6px 10px; text-transform: uppercase; }
+.kb-id { width: 200px; }
+.kb-ch { width: 70px; }
+.kb-ad { width: 70px; }
+.kb-in { font-family: ui-monospace, monospace; letter-spacing: .2em; }
+.kb-ok { color: #2a7a45; font-weight: 900; font-size: 24px; }

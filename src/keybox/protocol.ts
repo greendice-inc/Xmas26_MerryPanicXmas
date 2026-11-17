@@ -46,6 +46,12 @@ export const CMD = {
   unlock: '1042',
   lock: '124C',
   beep: '1641',
+  /** ランプは光らず、音（ピッ）だけ */
+  beepOnly: '1341',
+  /** 音は鳴らさず、ランプだけ光る */
+  lampOnly: '1441',
   correct: '1642',
   wrong: '1643',
+  /** 不正解音だけ（ランプなし）。実機で確認済み */
+  wrongOnly: '1343',
 } as const

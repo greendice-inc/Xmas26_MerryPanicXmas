@@ -1,8 +1,9 @@
 import ConnDot from '../components/ConnDot'
 import Header from '../components/Header'
 import HoldButton from '../components/HoldButton'
-import { KEYBOX_ADDR, KEYBOX_COUNT, ROOM_BY_TEAM, TEAM_COUNT } from '../config'
+import { KEYBOX_COUNT, ROOM_BY_TEAM, TEAM_COUNT } from '../config'
 import { toHex2 } from '../keybox/protocol'
+import { addrsOf, useKeyboxSettings } from '../keybox/settings'
 import { useKeyboxLink } from '../keybox/useKeyboxLink'
 import { getBackend } from '../net'
 import { requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
@@ -14,7 +15,8 @@ export default function MasterScreen() {
   const teams = useTeamsAll()
   const now = useNow()
   const keyboxes = useKeyboxAll()
-  const link = useKeyboxLink(keyboxes)
+  const [kbSettings] = useKeyboxSettings()
+  const link = useKeyboxLink(keyboxes, addrsOf(kbSettings))
   const sendFailed = useKeyboxSendFailed()
   const row = (key: string, label: string, extra?: React.ReactNode) => (
     <div className="conn-item" key={key}>
@@ -88,7 +90,7 @@ export default function MasterScreen() {
         <div className="conn-grid">
           {Array.from({ length: KEYBOX_COUNT }, (_, i) => {
             const id = i + 1
-            const addr = KEYBOX_ADDR[id]
+            const addr = kbSettings[id]?.ad
             const ringing = !!keyboxes[String(id)]?.ringing
             return (
               <div className="conn-item keybox-item" key={id}>

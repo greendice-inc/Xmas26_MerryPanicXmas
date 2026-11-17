@@ -5,6 +5,8 @@ import TwoTapButton from '../components/TwoTapButton'
 import { KEYBOX_COUNT, TEAM_COUNT } from '../config'
 import { getBackend } from '../net'
 import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
+import { toHex2 } from '../keybox/protocol'
+import { useKeyboxSettings } from '../keybox/settings'
 import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
 import { isGame1LoseCart } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
@@ -34,6 +36,7 @@ export default function StaffScreen() {
   // 下のバーで操作するキーボックス（1か2を切り替える）
   const [boxId, setBoxId] = useState(1)
   const sendFailed = useKeyboxSendFailed()
+  const [kbSettings] = useKeyboxSettings()
   const boxRinging = !!keyboxes[String(boxId)]?.ringing
   const now = useNow()
   // マスターが生きていて、そのUSBアンテナがつながっているときだけ、キーボックスに指令が届く
@@ -156,6 +159,7 @@ export default function StaffScreen() {
             )
           })}
         </div>
+        <span className="keybox-ad">ad 0x{toHex2(kbSettings[boxId]?.ad ?? 0)}</span>
         <button className={`keybox-ring${boxRinging ? ' is-on' : ' sub'}`} onClick={() => setKeyboxRinging(boxId, !boxRinging)}>
           {boxRinging ? '音を止める' : '音を鳴らす'}
         </button>
