@@ -5,7 +5,7 @@ import KidsRoom from '../components/KidsRoom'
 import Logo from '../components/Logo'
 import NovelPart from '../components/NovelPart'
 import ProblemDialog, { ArrivalNotice } from '../components/ProblemDialog'
-import { GuideTalk, RULES_AFTER_MARK, SOCK_TUTORIAL, type GuideLine } from '../games/Stage1Guide'
+import { GuideTalk, RULES_FX, SOCK_FX, type GuideFx } from '../games/Stage1Guide'
 import Santazon, { type RequestResult, type SzGuide, type SzTab } from '../components/Santazon'
 import BingoGame from '../games/BingoGame'
 import { isBingoCart, ROUNDS, roundOf } from '../games/bingoData'
@@ -139,7 +139,7 @@ export default function PlayerScreen({ team }: { team: number }) {
   const [arrivedSeenAt, setArrivedSeenAt] = useState<number | null>(null)
   const [problemOpen, setProblemOpen] = useState(false)
   // ステージ1の案内で、プレイヤーの操作を待っているもの
-  const [guideWait, setGuideWait] = useState<GuideLine['wait'] | null>(null)
+  const [guideWait, setGuideWait] = useState<GuideFx['wait'] | null>(null)
   // 正解直後、Firestore の反映を待たずにエルフを出すための時刻
   const [localProceedAt, setLocalProceedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -221,7 +221,9 @@ export default function PlayerScreen({ team }: { team: number }) {
     advancing.current = true
     setLocalProceedAt(null)
     const stage = stageRef.current
-    if (stage >= GAME_COUNT) update({ phase: 'end' })
+    // ステージ3は、部屋から戻ったあとにクリアの会話がある
+    if (stage === WORD_STAGE) update({ phase: 'clear' })
+    else if (stage >= GAME_COUNT) update({ phase: 'end' })
     else update({ stage: stage + 1, phase: 'novel' })
   }
 
@@ -235,6 +237,16 @@ export default function PlayerScreen({ team }: { team: number }) {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.order, doc.stage, doc.bingo?.step, doc.last?.step, products, update])
+
+  // ステージ3：正しい注文のナゾを解いたら、子ども部屋でカイ・メイがイスに登っていた話になる
+  const chairNow = doc.stage === WORD_STAGE && doc.phase === 'game' && doc.order?.status === 'solved' && !doc.word?.chairTold
+  useEffect(() => {
+    if (!chairNow) return
+    setShopOpen(false)
+    setChair(true)
+    update({ word: { ...DEFAULT_WORD, ...doc.word, chairTold: true } })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chairNow])
 
   // LAST：エントツとボールを入れて待ち時間が終わったら、タップを待たずに【重要】の通知へ
   const ballsDone = adultReady && lastStep === 'balls'
@@ -470,6 +482,14 @@ export default function PlayerScreen({ team }: { team: number }) {
   useEffect(() => {
     if (sockGuide) setShopOpen(false)
   }, [sockGuide])
+  // ステージ1の案内：santazon / ナゾの画面の上で話している途中に、その画面が閉じてしまったら開き直す
+  // （開発中の再読み込みで、台詞の位置は残るのに「マーク当て中は閉じる」が走り直す、など）
+  const reopenForGuide = (w: 'shop' | 'sock') => {
+    if (w === 'shop') {
+      setSzTab('list')
+      setShopOpen(true)
+    } else openProblem()
+  }
   // ソックスキーを導くボタンは、注文できる場面で出す（届くまでは灰色）
   const showSockKey = !markQuiz && doc.phase === 'game' && !shopOpen
   // 会話中に開いたままの画面は閉じる。テキストを送る以外の操作を残さない
@@ -502,13 +522,6 @@ export default function PlayerScreen({ team }: { team: number }) {
                 // 届いた注文のナゾ（閉じていても、ここから開き直せる）
                 onOpenProblem={openProblem}
                 guide={doc.phase === 'game' && doc.stage === HIDE_STAGE ? guide.sz : null}
-                onBeforeOrder={() => {
-                  // ステージ3：はじめて正しい注文をしたときは、カイ・メイが止めに入る
-                  if (doc.stage !== WORD_STAGE || doc.word?.chairTold) return false
-                  setChair(true)
-                  update({ word: { ...DEFAULT_WORD, ...doc.word, chairTold: true } })
-                  return true
-                }}
               />
             )}
           </div>
@@ -552,10 +565,12 @@ export default function PlayerScreen({ team }: { team: number }) {
           {rulesGuide && (
             <GuideTalk
               key="rules"
-              lines={RULES_AFTER_MARK}
+              sceneId="st1-rules"
+              fx={RULES_FX}
               shopOpen={shopOpen}
               sockOpen={problemOpen}
               onWait={setGuideWait}
+              onReopen={reopenForGuide}
               onDone={() =>
                 fadeThen(() => {
                   setShopOpen(false)
@@ -567,14 +582,16 @@ export default function PlayerScreen({ team }: { team: number }) {
           {sockGuide && (
             <GuideTalk
               key="sock"
-              lines={SOCK_TUTORIAL}
+              sceneId="st1-sock"
+              fx={SOCK_FX}
               shopOpen={shopOpen}
               sockOpen={problemOpen}
               onWait={setGuideWait}
+              onReopen={reopenForGuide}
               onDone={() => update({ sockTold: true })}
             />
           )}
-          {!talking && adultWait && (
+          {!talking && adultWait && !chair && (
             <div className="sz-elf-back is-static">
               <div className="sz-elf-line">
                 <img src={characterImage('Common', '真顔')} alt="" />
@@ -587,7 +604,7 @@ export default function PlayerScreen({ team }: { team: number }) {
               </div>
             </div>
           )}
-          {!talking && adultReady && lastStep !== 'balls' && (
+          {!talking && adultReady && !chair && lastStep !== 'balls' && (
             <div className="stage-next" onClick={goNext}>
               <div className="stage-next-row">
                 <i>▼</i>

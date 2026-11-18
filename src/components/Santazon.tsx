@@ -238,9 +238,12 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
                     <b>{p.name}</b>
                     <small>{formatCode(p.code)}</small>
                   </div>
-                  <button className="sz-item-btn is-detail" aria-label="詳細" onClick={() => setDetail(p)}>
-                    <img src={SZ.detail} alt="" draggable={false} />
-                  </button>
+                  {/* 詳細ボタンは、アイテム登録で「なし」にした商品には出さない */}
+                  {p.hasDetail && (
+                    <button className="sz-item-btn is-detail" aria-label="詳細" onClick={() => setDetail(p)}>
+                      <img src={SZ.detail} alt="" draggable={false} />
+                    </button>
+                  )}
                   <button className="sz-item-btn is-cart" aria-label="カートに追加" disabled={soldOut || full || ordering} onClick={() => add(p)}>
                     <img src={SZ.addCart} alt="" draggable={false} />
                   </button>

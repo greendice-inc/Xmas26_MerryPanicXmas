@@ -27,6 +27,8 @@ export interface Product {
   listed: boolean
   /** リスト追加検索で見られる説明。空なら「準備中」と表示 */
   description: string
+  /** false = Santazon のリストに詳細ボタンを出さない */
+  hasDetail: boolean
   /** 登録サイトだけのメモ。プレイヤーには出さない */
   note?: string
 }
@@ -40,7 +42,7 @@ const p = (
   listed: boolean,
   description = '',
   note = '',
-): Product => ({ id: `${category}-${n}`, category, name, code, stock, available: stock, listed, description, note })
+): Product => ({ id: `${category}-${n}`, category, name, code, stock, available: stock, listed, description, hasDetail: true, note })
 
 /** 「1564」→「1-5-6-4」 */
 export const formatCode = (code: string) => code.split('').join('-')

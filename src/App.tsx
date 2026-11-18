@@ -18,14 +18,14 @@ import { useAdultSkip } from './adultWait'
 import { DEFAULT_BINGO, type BingoStep, type Identity, type LastStep } from './types'
 import { LAST_STEPS } from './games/lastData'
 
-/** 開発用の商品登録は ?debug=true のときだけ開く */
+/** 開発用のアイテム登録は ?debug=true のときだけ開く */
 function isDebug(): boolean {
   return new URLSearchParams(location.search).get('debug') === 'true'
 }
 
 type Page = 'catalog' | 'script' | 'keybox'
 
-/** ?debug=true のときだけ開く画面（商品登録・セリフ編集・キーボックスのテスト） */
+/** ?debug=true のときだけ開く画面（アイテム登録・セリフ編集・キーボックスのテスト） */
 function debugPage(): Page | null {
   if (!isDebug()) return null
   const path = location.pathname.replace(/\/+$/, '')

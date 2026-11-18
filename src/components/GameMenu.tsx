@@ -1,5 +1,12 @@
-/** ゲーム画面の下に並べる3つのボタン */
+/** ゲーム画面の下に並べる3つのボタン（全ステージ共通。画像は public/BG/Common/tab_*.webp） */
 const ITEMS = ['注文', 'やるべきこと', '記録'] as const
+
+const TAB_DIR = `${import.meta.env.BASE_URL}BG/Common/`
+const TAB_IMAGE: Record<(typeof ITEMS)[number], string> = {
+  注文: `${TAB_DIR}tab_san.webp`,
+  やるべきこと: `${TAB_DIR}tab_yar.webp`,
+  記録: `${TAB_DIR}tab_log.webp`,
+}
 
 export default function GameMenu({
   shopOpen,
@@ -32,11 +39,12 @@ export default function GameMenu({
           <button
             key={label}
             data-menu={label}
-            className={`sub${label === '注文' && shopOpen ? ' on' : ''}${guide === label ? ' is-guide' : ''}`}
+            aria-label={label}
+            className={`game-tab${label === '注文' && shopOpen ? ' on' : ''}${guide === label ? ' is-guide' : ''}`}
             disabled={!!locked || !onClick}
             onClick={onClick}
           >
-            {label}
+            <img src={TAB_IMAGE[label]} alt="" draggable={false} />
           </button>
         )
       })}

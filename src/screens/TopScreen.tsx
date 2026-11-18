@@ -40,7 +40,7 @@ export default function TopScreen({
         <div className="top-debug-links">
           {onOpenKeybox && <button className="catalog-link script-link" onClick={onOpenKeybox}>キーボックステスト</button>}
           {onOpenScript && <button className="catalog-link script-link" onClick={onOpenScript}>セリフ編集</button>}
-          {onOpenCatalog && <button className="catalog-link" onClick={onOpenCatalog}>商品を登録</button>}
+          {onOpenCatalog && <button className="catalog-link" onClick={onOpenCatalog}>アイテム登録</button>}
         </div>
       </header>
 

@@ -1,0 +1,50 @@
+import { Fragment, useEffect, type ReactNode } from 'react'
+import type { NovelLine } from '../scenario'
+import { lineImage } from '../script/gameScenes'
+
+/** 「{強調}」を赤字にする（吹き出しの span は話者名の札になるので、地の文は span で包まない） */
+export function hl(text: string): ReactNode {
+  return text
+    .split(/(\{[^}]*\})/)
+    .filter(Boolean)
+    .map((s, i) => (s.startsWith('{') ? <b className="hl" key={i}>{s.slice(1, -1)}</b> : <Fragment key={i}>{s}</Fragment>))
+}
+
+/** 台詞が出たら効果音・音声を鳴らす。次の台詞に進んだら音声は止める */
+export function useLineSound(line: NovelLine | undefined) {
+  useEffect(() => {
+    if (!line) return
+    const play = (src?: string) => {
+      if (!src) return null
+      const a = new Audio(src)
+      a.play().catch(() => {})
+      return a
+    }
+    play(line.se)
+    const voice = play(line.voice)
+    return () => voice?.pause()
+  }, [line])
+}
+
+/**
+ * ゲーム画面の上で話す1行（セリフ編集の「ゲーム画面中」の場面）。
+ * pos：bottom=下のボタンのすぐ上 / top=画面の上 / shop=Santazon を開いている間の左下。
+ * compact=Santazon を開いているので小さめにする / wait=タップで進めない（▼を出さない）
+ */
+export default function GameTalk({ line, compact, wait }: { line: NovelLine; compact?: boolean; wait?: boolean }) {
+  useLineSound(line)
+  const pos = line.pos && line.pos !== 'bottom' ? ` is-${line.pos}` : compact ? ' is-compact' : ''
+  return (
+    <>
+      {line.slide && <img className="game-slide" src={line.slide} alt="" />}
+      <div className={`hide-elf guide-talk${pos}${wait ? ' is-wait' : ''}`}>
+        <img src={lineImage(line)} alt="" />
+        <p>
+          <span>{line.speaker}</span>
+          {hl(line.text)}
+          {!wait && <i>▼</i>}
+        </p>
+      </div>
+    </>
+  )
+}

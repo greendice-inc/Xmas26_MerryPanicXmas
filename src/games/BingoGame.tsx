@@ -1,20 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import GameTalk from '../components/GameTalk'
 import MoodCard from '../components/MoodCard'
+import { useGameLines } from '../script/scriptData'
 import { useProducts } from '../santazon/useProducts'
 import {
-  backgroundImage,
-  BINGO_CARD_IMAGE,
-  BINGO_HIT_IMAGE,
-  characterImage,
   JACK_ICON,
   ST4_MOOD,
   ST4_NAME,
   type Emotion,
+  type NovelLine,
 } from '../scenario'
 import { DEFAULT_BINGO, type BingoProgress, type TeamDoc } from '../types'
 import {
+  BINGO_BG_IMAGE,
   bingoCells,
+  DECK_BACK_IMAGE,
+  DECK_FACE_IMAGE,
+  HIDDEN_SHEET,
+  HOLE_IMAGE,
   holeChar,
   isBingoCart,
   itemLabel,
@@ -37,17 +41,13 @@ const AFTER_FLIP_MS = 1500
 const AFTER_BINGO_MS = 2200
 /** 「ROUND 1」を見せる長さ */
 const BANNER_MS = 2200
-const BG: CSSProperties = { backgroundImage: `url(${backgroundImage('Stage4')})` }
+const BG: CSSProperties = { backgroundImage: `url("${BINGO_BG_IMAGE}")` }
 
 type Side = 'kid' | 'adult'
 
-interface Line {
-  who: 'elf' | 'kid'
-  text: string
-  emotion?: Emotion
-}
-const elf = (text: string, emotion?: Emotion): Line => ({ who: 'elf', text, emotion })
-const kid = (text: string, emotion?: Emotion): Line => ({ who: 'kid', text, emotion })
+/** 会話の台詞は script/gameScenes.ts（セリフ編集の「チュートリアル（説明）」など） */
+type Line = NovelLine
+const elf = (text: string, emotion?: Emotion): Line => ({ speaker: 'エルフ', character: 'Common', text, emotion })
 
 // ---------- チュートリアルの台本 ----------
 interface Tut {
@@ -62,40 +62,24 @@ const TUT0: Tut = { dealt: false, decks: false, reveal: false, flips: 0, jack: f
 type Beat = { kind: 'say'; line: Line; set?: Partial<Tut> } | { kind: 'flip'; who: Side } | { kind: 'mood' }
 const say = (line: Line, set?: Partial<Tut>): Beat => ({ kind: 'say', line, set })
 
-const TUTORIAL_BEATS: Beat[] = [
-  say(elf('お互いに3×3のビンゴカードが配られます。'), { dealt: true }),
-  say(elf('次に、両プレイヤーにビンゴの穴をあけるためのアイテムを、Santazonで3つ注文していただきます。')),
-  say(elf('今回はアイテムのカードをそのまま使います。具現化する必要はありません。')),
-  say(elf('また、カードをみなさんが部屋に取りに行く必要はありません。')),
-  say(elf('宅配ソックスの番号を導いていただければ、私の方で取り出しておきます。')),
-  say(elf('Santazonに取り出し依頼ボタンを追加しておきます。ここにキーボックスの番号を入力して、取り出し依頼をしてください。')),
-  say(elf('今回は私の方でアイテムを注文しますね。', '楽')),
-  say(elf('お互いがアイテムを3つ注文したら、注文したカードをお互いの山札とします。'), { decks: true }),
-  say(elf('山札のカードはお互いシャッフルしているので、表示されている順番で来るとは限りません。')),
-  say(elf('今回は練習なので、お互いの？を明かした状態で進めます。'), { reveal: true }),
-  say(elf('ビンゴカードと山札がそろったら、ロビンさんから交互に山札を1枚ずつオープンします。')),
-  say(elf('どのような条件で穴が開くかは秘密です。今回の練習で推測してみてください。')),
-  say(kid('じゃあめくるね。', '楽')),
-  { kind: 'flip', who: 'kid' },
-  { kind: 'flip', who: 'adult' },
-  { kind: 'flip', who: 'kid' },
-  { kind: 'flip', who: 'adult' },
-  { kind: 'flip', who: 'kid' },
-  say(elf('今回、ロビンさんが先にビンゴしたためロビンさんの勝利です。')),
-  say(elf('お互い3枚めくってビンゴにならなかった場合は、お互いの負けとなります。')),
-  say(elf('キモチヨメール使用中…')),
-  { kind: 'mood' },
-  say(elf('頑張って負けましょう（コソ）', '楽')),
-  say(elf('ジャック機能を解放します。')),
-  say(elf('ジャック機能を使うと、子供側の画面を見ることができます。')),
-  say(elf('操作することはできません。あくまで見るだけです。秘密ですよ。')),
-  say(elf('右上に追加しておきました。頑張ってください。', '楽'), { jack: true }),
-]
+/** チュートリアルの説明（st4-tutorial）の、行ごとの演出 */
+const TUTORIAL_FX: Record<number, Partial<Tut>> = { 0: { dealt: true }, 7: { decks: true }, 9: { reveal: true } }
 
-const ROUND_END: Record<'r1' | 'r2', Line[]> = {
-  r1: [kid('やったー！1回目は僕の勝ち！', '喜'), elf('・・・'), elf('ROUND2を開始します。')],
-  r2: [kid('やったー！勝った！', '喜'), elf('・・・'), elf('良かったですね'), elf('では続いてLASTに進みましょう。', '楽')],
+/** チュートリアルの流れ：説明 → 交互に5枚めくる → ビンゴのあと → キモチ → ジャック機能（最後の行でアイコンが出る） */
+function tutorialBeats(intro: Line[], after: Line[], jack: Line[]): Beat[] {
+  return [
+    ...intro.map((l, i) => say(l, TUTORIAL_FX[i])),
+    { kind: 'flip', who: 'kid' },
+    { kind: 'flip', who: 'adult' },
+    { kind: 'flip', who: 'kid' },
+    { kind: 'flip', who: 'adult' },
+    { kind: 'flip', who: 'kid' },
+    ...after.map((l) => say(l)),
+    { kind: 'mood' },
+    ...jack.map((l, i) => say(l, i === jack.length - 1 ? { jack: true } : undefined)),
+  ]
 }
+
 /** 起きないはずだが、ロビンが勝たなかったとき */
 const RETRY_ADULT: Line[] = [elf('大人の方が先にビンゴしてしまいました…'), elf('もう一度やり直しましょう。')]
 const RETRY_NONE: Line[] = [elf('お互いビンゴになりませんでした。'), elf('もう一度やり直しましょう。')]
@@ -171,6 +155,14 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   }, [])
   const overlay = (node: ReactNode) => (host ? createPortal(node, host) : null)
 
+  const tutIntro = useGameLines('st4-tutorial')
+  const tutAfter = useGameLines('st4-tutorial-bingo')
+  const tutJack = useGameLines('st4-jack')
+  const sockLine = useGameLines('st4-sock')[0]
+  const ROUND_END = { r1: useGameLines('st4-r1-end'), r2: useGameLines('st4-r2-end') }
+  // チュートリアルは、始まったときの台詞で最後まで進める（途中で台本が変わらないように）
+  const beatsRef = useRef<Beat[]>([])
+  const TUTORIAL_BEATS = beatsRef.current
   const [talk, setTalk] = useState<{ lines: Line[]; idx: number; then?: () => void } | null>(null)
   const [mood, setMood] = useState<{ then?: () => void } | null>(null)
   const [jackOpen, setJackOpen] = useState(false)
@@ -181,6 +173,7 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   const tutorial = bingo.step === 'rule'
   useEffect(() => {
     if (!tutorial) return
+    beatsRef.current = tutorialBeats(tutIntro, tutAfter, tutJack)
     setTut(TUT0)
     setBeat(0)
   }, [tutorial])
@@ -294,6 +287,13 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
     setTalk(null)
     talk.then?.()
   }
+  // セリフ編集で台詞を全部消した場面は、すぐ次へ
+  useEffect(() => {
+    if (talk && !talk.lines[talk.idx]) {
+      setTalk(null)
+      talk.then?.()
+    }
+  })
 
   // ---------- 表示 ----------
   const dealt = tutorial ? tut.dealt : true
@@ -342,20 +342,8 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
       <div className="bingo-head">
         {label && <div className="bingo-label">{label}</div>}
       </div>
+      {/* めくったものは、上下の吹き出し（山札の中身）で印がつく */}
       <Board view={view} perspective="adult" center={center} />
-      {/* めくったカードの記録（めくった順に左から） */}
-      {f.seq.length > 0 && (
-        <div className="bingo-log">
-          <span className="bingo-log-title">めくったカード</span>
-          {f.seq.map((c, i) => (
-            <div className={`bingo-log-card is-${c.who}`} key={i}>
-              <small>{i + 1}. {c.who === 'kid' ? ST4_NAME : 'あなた'}</small>
-              <b>{c.item.name}</b>
-              <em>×{c.item.n}</em>
-            </div>
-          ))}
-        </div>
-      )}
 
       {jack && (
         <button className="bingo-jack" aria-label="ジャック機能（ロビンの画面を見る）" onClick={() => setJackOpen(true)}>
@@ -398,9 +386,10 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
               className="hide-catch"
               onClick={line ? nextTalk : () => setBingo({ deckIn: true })}
             />
-            <TalkLine
+            <GameTalk
               key={line ? `${talk?.lines[0]?.text}${talk?.idx}` : 'sock'}
-              line={line ?? elf(`宅配ソックスの番号は「${round.problem?.code}」ですね。\nカードを取り出しておきます。`)}
+              // [番号] は、そのラウンドの宅配ソックスの番号
+              line={line ?? { ...(sockLine ?? elf('')), text: (sockLine?.text ?? '').replace(/\[番号\]/g, round.problem?.code ?? '') }}
               compact={shopOpen}
             />
           </>,
@@ -409,20 +398,7 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   )
 }
 
-function TalkLine({ line, compact }: { line: Line; compact: boolean }) {
-  return (
-    <div className={`hide-elf bingo-talk${compact ? ' is-compact' : ''}`}>
-      <img src={line.who === 'elf' ? characterImage('Common', line.emotion ?? '真顔') : characterImage('Stage4', line.emotion ?? '真顔')} alt="" />
-      <p>
-        <span>{line.who === 'elf' ? 'エルフ' : ST4_NAME}</span>
-        {line.text}
-        <i>▼</i>
-      </p>
-    </div>
-  )
-}
-
-// ---------- 盤面 ----------
+// ---------- 盤面（ビンゴ１.webp：1920×841 の座標で置く） ----------
 interface BoardView {
   flow: Flow
   /** カードが配られた */
@@ -436,68 +412,58 @@ interface BoardView {
   kidList: BingoItem[]
 }
 
-/** perspective の側が自分。相手のカードと山札の中身は、明かすまで？ */
+/**
+ * perspective の側が自分。相手のカードと山札の中身は、明かすまで？。
+ * 左が大人（青）、右がロビン（黄）。上の吹き出しがロビンの山札、下の吹き出しが大人の山札。
+ * ジャック機能（ロビンの画面）でも並びは同じで、？になる側だけが入れ替わる
+ */
 function Board({ view, perspective, center }: { view: BoardView; perspective: Side; center?: ReactNode }) {
   const { flow: f } = view
   const chars = f.seq.map((s) => holeChar(s.item))
-  // 左が大人、右がロビン。ジャック機能（ロビンの画面）でも並びは同じで、？になる側だけが入れ替わる
   const sides: Side[] = ['adult', 'kid']
   const last = f.seq[f.seq.length - 1]
   return (
     <div className="bingo-board">
-      {sides.map((side, k) => {
-        const mine = side === perspective
-        const hidden = !mine && !view.reveal
-        const cardLetters = side === 'kid' ? f.round.kid : f.round.adult
-        const deckIn = side === 'kid' ? view.kidDeck : view.adultDeck
-        const list = side === 'kid' ? view.kidList : f.round.adultDeck
+      {sides.map((side) => {
+        const hidden = side !== perspective && !view.reveal
+        const letters = side === 'kid' ? f.round.kid : f.round.adult
         const flipped = side === 'kid' ? f.kidFlipped : f.adultFlipped
         const total = side === 'kid' ? f.round.kidDeck.length : f.round.adultDeck.length
-        const owner = side === 'kid' ? ST4_NAME : perspective === 'adult' ? 'あなた' : '大人'
-        const deck = (
-          <Deck
-            key="deck"
-            inDeck={deckIn}
-            left={total - flipped.length}
-            list={list}
-            hidden={hidden}
-            flipped={flipped}
-            side={side}
-          />
-        )
-        const cardEl = (
+        const deckIn = side === 'kid' ? view.kidDeck : view.adultDeck
+        return [
           <Card
-            key="card"
-            letters={cardLetters}
-            owner={owner}
+            key={`card-${side}`}
             side={side}
-            hidden={hidden}
+            image={hidden ? HIDDEN_SHEET[side] : f.round.sheets[side]}
+            letters={letters}
             dealt={view.dealt}
-            open={openedCells(cardLetters, chars)}
+            open={openedCells(letters, chars)}
             line={side === 'kid' ? f.kidLine : f.adultLine}
             win={f.winner === side}
-          />
-        )
-        return (
-          <div className={`bingo-side is-${side}${k === 0 ? ' is-left' : ' is-right'}`} key={side}>
-            {k === 0 ? [deck, cardEl] : [cardEl, deck]}
-          </div>
-        )
+          />,
+          <Deck key={`deck-${side}`} side={side} inDeck={deckIn} left={total - flipped.length} />,
+          <DeckList
+            key={`list-${side}`}
+            side={side}
+            inDeck={deckIn}
+            list={side === 'kid' ? view.kidList : f.round.adultDeck}
+            flipped={flipped}
+            hidden={hidden}
+          />,
+        ]
       })}
-      <div className="bingo-center">
-        <div className="bingo-open-slot">
-          {last ? (
-            <div className={`bingo-face is-${last.who}`} key={f.seq.length}>
-              <small>{last.who === 'kid' ? `${ST4_NAME}がめくったカード` : perspective === 'adult' ? 'あなたがめくったカード' : '大人がめくったカード'}</small>
-              <b>{last.item.name}</b>
-              <em>×{last.item.n}</em>
-            </div>
-          ) : (
-            <div className="bingo-face is-empty">めくったカード</div>
-          )}
-        </div>
-        <div className="bingo-action">{center}</div>
+      {/* 真ん中：めくったカード */}
+      <div className="bingo-open-slot">
+        <img className="bingo-face-bg" src={DECK_FACE_IMAGE} alt="" draggable={false} />
+        {last && (
+          <div className={`bingo-face is-${last.who}`} key={f.seq.length}>
+            <small>{last.who === 'kid' ? ST4_NAME : perspective === 'adult' ? 'あなた' : '大人'}</small>
+            <b className={Array.from(last.item.name).length > 5 ? 'is-long' : ''}>{last.item.name}</b>
+            <em>×{last.item.n}</em>
+          </div>
+        )}
       </div>
+      {center && <div className="bingo-action">{center}</div>}
     </div>
   )
 }
@@ -511,89 +477,88 @@ function marks(list: BingoItem[], flipped: BingoItem[]) {
   })
 }
 
-/** ビンゴカードのマスの位置（bingo_card.png 488×594 に合わせる） */
-const cellStyle = (i: number): CSSProperties => {
-  const col = i % 3
-  const row = Math.floor(i / 3)
-  return {
-    left: `${((31 + col * 145) / 488) * 100}%`,
-    top: `${((141 + row * 146) / 594) * 100}%`,
-    width: `${(136 / 488) * 100}%`,
-    height: `${(136 / 594) * 100}%`,
-  }
-}
+/** カード画像（450×450）の1マスは 150px。〇（maru.webp）をマスの真ん中に重ねる */
+const CELL = 150
+const cellStyle = (i: number): CSSProperties => ({ left: (i % 3) * CELL, top: Math.floor(i / 3) * CELL })
 
 function Card({
-  letters,
-  owner,
   side,
-  hidden,
+  image,
+  letters,
   dealt,
   open,
   line,
   win,
 }: {
-  letters: BingoCard
-  owner: string
   side: Side
-  hidden: boolean
+  image: string
+  letters: BingoCard
   dealt: boolean
   open: Set<number>
   line: number[]
   win: boolean
 }) {
-  if (!dealt) return <div className="bingo-card is-empty" />
+  if (!dealt) return <div className={`bingo-card is-${side} is-empty`} />
   const lineSet = new Set(line)
   return (
     <div className={`bingo-card is-${side}${win ? ' is-win' : ''}`}>
-      <img className="bingo-card-bg" src={BINGO_CARD_IMAGE} alt="" draggable={false} />
-      <span className="bingo-owner">{owner}</span>
-      {letters.map((ch, i) => (
-        <div className={`bingo-cell${lineSet.has(i) ? ' is-line' : ''}`} key={i} style={{ ...cellStyle(i), '--i': i } as CSSProperties}>
-          <b className={hidden ? 'is-hidden' : ''} key={hidden ? 'h' : 'v'}>{hidden ? '？' : ch}</b>
-          {open.has(i) && <img className="bingo-hit" src={BINGO_HIT_IMAGE} alt="" draggable={false} />}
-        </div>
-      ))}
+      <img className="bingo-sheet" src={image} alt="" draggable={false} />
+      {letters.map((_, i) =>
+        open.has(i) ? (
+          <img
+            key={i}
+            className={`bingo-hole${lineSet.has(i) ? ' is-line' : ''}`}
+            src={HOLE_IMAGE}
+            alt=""
+            draggable={false}
+            style={cellStyle(i)}
+          />
+        ) : null,
+      )}
       {win && <div className="bingo-win">BINGO!</div>}
     </div>
   )
 }
 
-function Deck({
-  inDeck,
-  left,
-  list,
-  hidden,
-  flipped,
-  side,
-}: {
-  inDeck: boolean
-  left: number
-  list: BingoItem[]
-  hidden: boolean
-  flipped: BingoItem[]
-  side: Side
-}) {
+/** 山札（card_1.webp の裏面を、残りの枚数だけ少しずらして重ねる） */
+function Deck({ side, inDeck, left }: { side: Side; inDeck: boolean; left: number }) {
   return (
     <div className={`bingo-deck is-${side}`}>
-      <div className="bingo-deck-title">山札</div>
-      <div className="bingo-stack">
-        {inDeck ? (
-          Array.from({ length: left }, (_, i) => <i key={i} style={{ '--k': i } as CSSProperties} />)
-        ) : (
-          <span className="bingo-stack-empty">{side === 'adult' ? '注文した\nカードが\n入ります' : ''}</span>
-        )}
-        {inDeck && left === 0 && <span className="bingo-stack-empty">なし</span>}
-      </div>
-      {inDeck && (
-        <ul className="bingo-list">
-          {marks(list, flipped).map(({ c, used }, i) => (
-            <li key={i} className={used ? 'is-used' : ''}>
-              {hidden && !used ? '？' : itemLabel(c)}
-            </li>
-          ))}
-        </ul>
+      {inDeck && left > 0 ? (
+        Array.from({ length: left }, (_, i) => (
+          <img key={i} src={DECK_BACK_IMAGE} alt="" draggable={false} style={{ '--k': i } as CSSProperties} />
+        ))
+      ) : (
+        <span className="bingo-deck-empty">{!inDeck && side === 'adult' ? '注文した\nカードが\n入ります' : ''}</span>
       )}
     </div>
+  )
+}
+
+/** 吹き出しの中身：山札のカードを「・」でつなぐ。相手の分は、めくるまで？ */
+function DeckList({
+  side,
+  inDeck,
+  list,
+  flipped,
+  hidden,
+}: {
+  side: Side
+  inDeck: boolean
+  list: BingoItem[]
+  flipped: BingoItem[]
+  hidden: boolean
+}) {
+  const items = inDeck ? marks(list, flipped) : list.map((c) => ({ c, used: false }))
+  const allQ = items.every(({ used }) => !inDeck || (hidden && !used))
+  return (
+    <p className={`bingo-deck-list is-${side}${allQ ? ' is-all-q' : ''}`}>
+      {items.map(({ c, used }, i) => (
+        <span key={i} className={`${used ? 'is-used' : ''}${!inDeck || (hidden && !used) ? ' is-q' : ''}`}>
+          {i > 0 && <i>・</i>}
+          {!inDeck || (hidden && !used) ? '？' : itemLabel(c)}
+        </span>
+      ))}
+    </p>
   )
 }

@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import GameTalk from '../components/GameTalk'
 import TenKey from '../components/TenKey'
-import { backgroundImage, characterImage, JACK_ICON, st3GameImage, STF_NAME, type Emotion } from '../scenario'
+import { useGameLines } from '../script/scriptData'
+import { backgroundImage, JACK_ICON, st3GameImage, STF_NAME } from '../scenario'
 import { DEFAULT_LAST, type LastProgress, type TeamDoc } from '../types'
-import { LAST_ADULT_POINTS, LAST_KID_POINTS, LAST_REQUEST_CODE } from './lastData'
+import { LAST_ADULT_POINTS, LAST_KID_POINTS } from './lastData'
 import { ASPECT, WORD_GAMES, WordBoard } from './WordGame'
 import { useWordAreas } from './wordAreas'
 
@@ -13,13 +15,6 @@ const COUNT_MS = 380
 /** ジャック機能で見える、ルドリーの注文ナゾ（画像が来たら public 配下のパスを入れる） */
 const KID_PROBLEM_IMAGE: string | undefined = undefined
 
-interface Line {
-  who: 'elf' | 'kid'
-  text: string
-  emotion?: Emotion
-}
-const elf = (text: string, emotion?: Emotion): Line => ({ who: 'elf', text, emotion })
-
 /** 画面の外（注文ボタン）まで覆うため、会話などはプレイヤー画面の上に出す */
 function usePortal() {
   const [host, setHost] = useState<HTMLElement | null>(null)
@@ -28,19 +23,6 @@ function usePortal() {
     setHost(ref.current?.closest<HTMLElement>('.screen.player') ?? null)
   }, [])
   return { ref, overlay: (node: ReactNode) => (host ? createPortal(node, host) : null) }
-}
-
-function TalkLine({ line, compact }: { line: Line; compact?: boolean }) {
-  return (
-    <div className={`hide-elf bingo-talk${compact ? ' is-compact' : ''}`}>
-      <img src={line.who === 'elf' ? characterImage('Common', line.emotion ?? '真顔') : characterImage('StageF', line.emotion ?? '真顔')} alt="" />
-      <p>
-        <span>{line.who === 'elf' ? 'エルフ' : STF_NAME}</span>
-        {line.text}
-        <i>▼</i>
-      </p>
-    </div>
-  )
 }
 
 /** 大人チームとルドリーの得点 */
@@ -78,6 +60,7 @@ interface Props {
 /** LAST：エントツギフトのゲーム画面。お互いの得点と、ジャック機能・キモチ */
 export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
   const last: LastProgress = { ...DEFAULT_LAST, ...doc.last }
+  const extractLine = useGameLines('st5-extract')[0]
   const { ref, overlay } = usePortal()
   const [jackOpen, setJackOpen] = useState(false)
   // 大人部屋でボールを入れたあと（通知が来たころ）には、大人の得点が入っている
@@ -128,7 +111,7 @@ export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
         overlay(
           <>
             <div className="hide-catch" onClick={() => update({ last: { ...last, step: 'balls' } })} />
-            <TalkLine line={elf(`番号は「${LAST_REQUEST_CODE}」ですね。\nアイテムを取り出しておきます。`)} compact={shopOpen} />
+            {extractLine && <GameTalk line={extractLine} compact={shopOpen} />}
           </>,
         )}
 
@@ -145,13 +128,6 @@ export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
     </div>
   )
 }
-
-const END_LINES_1: Line[] = [
-  elf('それではルドリーさんの\n用意したボールを入れます！', '楽'),
-  elf('まずは「金庫」を入れますね。'),
-  elf('そして次はスーパーボールを入れます。'),
-]
-const END_LINES_2: Line[] = [elf('ということで、今回のゲームの勝者は\nルドリーさんです！', '楽'), { who: 'kid', text: 'やった～！', emotion: '喜' }]
 
 /** LAST の最後：エルフがルドリーのボールを入れ、ルドリーが勝つ。終わったらエクストラゲームへ */
 export function LastEnding() {
@@ -174,7 +150,13 @@ export function LastEnding() {
     return () => clearTimeout(t)
   }, [part, kid])
 
-  const lines = part === 'talk1' ? END_LINES_1 : part === 'talk2' ? END_LINES_2 : null
+  const end1 = useGameLines('st5-end1')
+  const end2 = useGameLines('st5-end2')
+  const lines = part === 'talk1' ? end1 : part === 'talk2' ? end2 : null
+  // セリフ編集で台詞を全部消した場面は、すぐ次へ
+  useEffect(() => {
+    if (lines && !lines[idx]) setPart(part === 'talk1' ? 'count' : 'done')
+  })
   const next = () => {
     if (!lines) return
     if (idx + 1 < lines.length) return setIdx(idx + 1)
@@ -199,7 +181,7 @@ export function LastEnding() {
         overlay(
           <>
             <div className="hide-catch" onClick={next} />
-            <TalkLine line={lines[idx]} key={`${part}${idx}`} />
+            {lines[idx] && <GameTalk line={lines[idx]} key={`${part}${idx}`} />}
           </>,
         )}
     </div>

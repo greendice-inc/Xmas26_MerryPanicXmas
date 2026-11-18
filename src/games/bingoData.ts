@@ -10,12 +10,25 @@ import type { BingoStep, OrderItem } from '../types'
 export interface BingoItem {
   name: string
   n: number
+  /** 吹き出しに出す言い方（「バット3本」など）。なければ「名前×N」 */
+  label?: string
 }
 
 /** 真ん中のマスを最初から開けておくか（資料の並びは9文字なので、いまは開けない） */
 export const FREE_CENTER = false
 
-export const itemLabel = (c: BingoItem) => `${c.name}×${c.n}`
+export const itemLabel = (c: BingoItem) => c.label ?? `${c.name}×${c.n}`
+
+const SHEET_DIR = `${import.meta.env.BASE_URL}BG/Stage4/bingo/`
+/** ビンゴカードの画像（文字が乗った 450×450）。大人は青、ロビンは黄色 */
+export const sheetImage = (file: string) => `${SHEET_DIR}${file}.webp`
+/** 相手のカードを明かす前の「？」のカード */
+export const HIDDEN_SHEET = { adult: sheetImage('sheet1_3'), kid: sheetImage('sheet3_2') }
+export const DECK_BACK_IMAGE = sheetImage('card_1')
+export const DECK_FACE_IMAGE = sheetImage('card_2')
+export const HOLE_IMAGE = sheetImage('maru')
+/** ビンゴの背景（上がロビンの山札の吹き出し、下が大人の山札の吹き出し） */
+export const BINGO_BG_IMAGE = sheetImage('4th_back')
 /** そのカードで穴が開く文字（名前のN文字目） */
 export const holeChar = (c: BingoItem) => Array.from(c.name)[c.n - 1] ?? ''
 
@@ -28,6 +41,8 @@ export interface BingoRound {
   adult: BingoCard
   /** 子ども（ロビン）のカード */
   kid: BingoCard
+  /** カードの画像（文字は adult / kid と同じ並び） */
+  sheets: { adult: string; kid: string }
   /** ロビンの山札 */
   kidDeck: BingoItem[]
   /** 大人の山札。チュートリアルはエルフが注文したもの、ラウンドは正しい注文 */
@@ -43,8 +58,10 @@ export interface BingoRound {
 
 /** チュートリアル。ロビンが先にビンゴする */
 export const TUTORIAL: BingoRound = {
-  adult: card('トシボ', 'ブリム', 'キゴク'),
+  // 画像（sheet0_1）に合わせて、真ん中の段は「ブリス」
+  adult: card('トシボ', 'ブリス', 'キゴク'),
   kid: card('リフイ', 'ヨコロ', 'チシブ'),
+  sheets: { adult: sheetImage('sheet0_1'), kid: sheetImage('sheet0_2') },
   // めくる順（チュートリアルはシャッフルしない）
   kidDeck: [
     { name: 'シュークリーム', n: 5 },
@@ -68,10 +85,12 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
   r1: {
     adult: card('グラカ', 'トマギ', 'アクウ'),
     kid: card('アトス', 'マギチ', 'ウグハ'),
+    sheets: { adult: sheetImage('sheet1_1'), kid: sheetImage('sheet1_2') },
+    // 言い方は noz_1.webp の吹き出しに合わせる
     kidDeck: [
-      { name: 'マクラ', n: 1 },
-      { name: 'バット', n: 3 },
-      { name: 'エノグ', n: 3 },
+      { name: 'マクラ', n: 1, label: 'まくら' },
+      { name: 'バット', n: 3, label: 'バット3本' },
+      { name: 'エノグ', n: 3, label: 'えのぐ3本' },
     ],
     adultDeck: [
       { name: 'グラス', n: 3 },
@@ -84,10 +103,12 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
   r2: {
     adult: card('ウナヘ', 'ギアラ', 'カルク'),
     kid: card('ナカラ', 'アウク', 'ヘユル'),
+    sheets: { adult: sheetImage('sheet1_2_1'), kid: sheetImage('sheet2_2') },
+    // 言い方は noz_2.webp の吹き出しに合わせる
     kidDeck: [
-      { name: 'ユビニンギョウ', n: 5 },
-      { name: 'エクレア', n: 4 },
-      { name: 'ウサギ', n: 1 },
+      { name: 'ユビニンギョウ', n: 5, label: '指人形5個' },
+      { name: 'エクレア', n: 4, label: 'エクレア4個' },
+      { name: 'ウサギ', n: 1, label: 'ウサギのぬいぐるみ' },
     ],
     adultDeck: [
       { name: 'ヘビ', n: 1 },

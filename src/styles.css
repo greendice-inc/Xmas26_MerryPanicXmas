@@ -343,13 +343,18 @@ button.keybox-tab.is-on { background: var(--charcoal); color: #fff; }
 /* 枠があったときの見た目の位置を保ったまま、背景だけ端まで出す */
 .play-area .novel-panel { left: 90px; right: 90px; bottom: 236px; }
 .play-area .novel-char { bottom: 490px; }
-.game-menu { position: absolute; left: 40px; right: 40px; bottom: 40px; height: 120px; z-index: 6; display: flex; gap: 28px; }
+/* 下のボタン（トップ２.webp）：580x120 を x=40 / 670 / 1300、y=1080〜1200（画面の下端につける） */
+.game-menu { position: absolute; left: 40px; right: 40px; bottom: 0; height: 120px; z-index: 6; display: flex; gap: 50px; }
 .game-menu.is-locked { pointer-events: none; }
-.game-menu button { flex: 1; font-size: 44px; padding: 0; }
-.game-menu button.sub:disabled, .game-menu button.sub:disabled:active {
-  background: #3a3a3e; color: #8a8a90; cursor: default;
-  box-shadow: inset 0 0 0 4px #2c2c30, 0 6px 0 #222226;
+.game-menu button.game-tab {
+  position: relative; flex: 1; min-width: 0; padding: 0; background: none; border-radius: 28px 28px 0 0;
+  box-shadow: none; transition: filter .12s ease;
 }
+.game-tab img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; user-select: none; }
+.game-menu button.game-tab:active { transform: none; box-shadow: none; filter: brightness(.85); }
+.game-menu button.game-tab:disabled, .game-menu button.game-tab:disabled:active { background: none; box-shadow: none; filter: grayscale(1) brightness(.8); opacity: .6; }
+/* 注文（santazon）を開いているあいだ：白い縁で「押されている」ことを示す */
+.game-menu button.game-tab.on::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 8px #fff; pointer-events: none; }
 .game {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px;
   background: linear-gradient(#f3f3f4, #e4e4e7);
@@ -393,7 +398,6 @@ button.hold-btn { position: relative; overflow: hidden; --edge: #1c1c1f; backgro
 button.armed { animation: armed-pulse .6s ease-in-out infinite alternate; }
 @keyframes armed-pulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
 
-.game-menu .on { --edge: var(--red); box-shadow: inset 0 0 0 4px var(--red), 0 6px 0 var(--red); color: var(--red); }
 
 /* ---------- Santazon（注文画面） ---------- */
 .santazon { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: #eaeded; color: #0f1111; }
@@ -860,7 +864,7 @@ button.hide-area.is-debug span {
 @keyframes found-pop { from { transform: translate(-50%, -50%) scale(.2) rotate(-10deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1) rotate(-4deg); opacity: 1; } }
 .hide-seek .mood-heart.hide-heart { bottom: 210px; }
 button.hide-kid-icon {
-  position: absolute; right: calc(var(--rec-c) - 75px); bottom: 390px; z-index: 4; width: 150px; height: 150px; padding: 0;
+  position: absolute; right: 270px; bottom: 210px; z-index: 4; width: 156px; height: 156px; padding: 0;
   background: #fff; border-radius: 50%; overflow: hidden;
   box-shadow: inset 0 0 0 6px var(--charcoal), 0 6px 0 var(--charcoal);
   animation: pop-in .4s cubic-bezier(.2, 1.4, .4, 1) both;
@@ -1003,6 +1007,8 @@ button.hide-edit-btn {
 .catalog-page .sheet .col-available input, .catalog-page .sheet .col-stock input { text-align: right; }
 .sheet .col-listed { width: 90px; }
 .sheet .col-listed label { display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 13px; cursor: pointer; }
+.sheet .col-hasDetail { width: 90px; }
+.sheet .col-hasDetail label { display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 13px; cursor: pointer; }
 .sheet .col-description { min-width: 320px; }
 .sheet .col-image { width: 110px; }
 .sheet .col-note { min-width: 200px; }
@@ -1203,102 +1209,92 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
 /* ---------- ステージ4：カタカナビンゴ ---------- */
 .bingo-game {
   position: absolute; inset: 0; overflow: hidden;
-  background: #52e0e0 center / cover no-repeat;
+  background: #8a3c00 top center / cover no-repeat;
 }
-.bingo-head { position: absolute; left: 0; right: 0; top: 34px; display: flex; justify-content: center; pointer-events: none; }
+/* ラウンドの名前（左上。上の吹き出しにかからないところ） */
+.bingo-head { position: absolute; left: 24px; top: 44px; z-index: 3; pointer-events: none; }
 .bingo-label {
-  padding: 12px 48px; font-family: 'Line', sans-serif; font-size: 44px; font-weight: 900; color: #fff;
-  background: var(--charcoal); border-radius: 999px; box-shadow: 0 6px 0 #1c1c1f;
+  padding: 8px 22px; font-family: 'Line', sans-serif; font-size: 28px; font-weight: 900; color: #fff;
+  background: var(--charcoal); border-radius: 999px; box-shadow: 0 4px 0 #1c1c1f; white-space: nowrap;
 }
-.bingo-board {
-  position: absolute; left: 40px; right: 40px; top: 140px;
-  display: flex; align-items: flex-start; justify-content: center; gap: 18px;
-}
-.bingo-side { display: flex; align-items: flex-start; gap: 18px; }
-.bingo-side.is-left { order: 0; }
-.bingo-center { order: 1; }
-.bingo-side.is-right { order: 2; }
+/* 盤面：ビンゴ１.webp（1920×841）の座標でそのまま置く。背景 4th_back.webp に吹き出しが描いてある */
+.bingo-board { position: absolute; left: 0; top: 0; width: 1920px; height: 841px; }
 
-/* カード（bingo_card.png 488×594） */
-.bingo-card { position: relative; width: 440px; aspect-ratio: 488 / 594; flex: none; animation: bingo-deal .7s cubic-bezier(.2, 1.1, .4, 1) both; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .28)); }
-.bingo-side.is-right .bingo-card { animation-delay: .25s; }
-.bingo-card.is-empty { animation: none; filter: none; border: 6px dashed rgba(255, 255, 255, .7); border-radius: 18px; }
-.bingo-card-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* カード（文字入りの 450×450）。左が大人、右がロビン */
+.bingo-card { position: absolute; top: 205px; width: 450px; height: 450px; animation: bingo-deal .7s cubic-bezier(.2, 1.1, .4, 1) both; }
+.bingo-card.is-adult { left: 105px; }
+.bingo-card.is-kid { left: 1365px; animation-delay: .25s; }
+.bingo-card.is-empty { animation: none; border: 6px dashed rgba(255, 255, 255, .55); }
+.bingo-sheet { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 @keyframes bingo-deal {
   from { opacity: 0; transform: translateY(-520px) rotate(-18deg) scale(.55); }
   to { opacity: 1; transform: none; }
 }
-.bingo-owner {
-  position: absolute; right: 18px; top: 22px; padding: 6px 26px;
-  font-size: 34px; font-weight: 900; color: #fff; background: var(--charcoal); border-radius: 999px;
-}
-.bingo-card.is-kid .bingo-owner { background: #2f6fde; }
-.bingo-card.is-adult .bingo-owner { background: var(--red); }
-.bingo-cell { position: absolute; display: flex; align-items: center; justify-content: center; }
-.bingo-cell b {
-  font-family: 'Line', sans-serif; font-size: 82px; font-weight: 900; line-height: 1; color: var(--ink);
-  animation: fade-in .3s calc(var(--i) * 70ms + .55s) ease both;
-}
-.bingo-cell b.is-hidden { color: #9a9aa6; }
-.bingo-hit {
-  position: absolute; left: 4%; top: 10%; width: 92%; height: 80%; object-fit: contain;
-  mix-blend-mode: multiply; animation: bingo-hit .5s cubic-bezier(.2, 1.6, .4, 1) both;
-}
+/* 開いたマスの〇（maru.webp 151px を 150px のマスに） */
+.bingo-hole { position: absolute; width: 150px; height: 150px; pointer-events: none; animation: bingo-hit .5s cubic-bezier(.2, 1.6, .4, 1) both; }
 @keyframes bingo-hit { from { opacity: 0; transform: scale(.2) rotate(-40deg); } to { opacity: 1; transform: none; } }
-.bingo-cell.is-line { background: rgba(255, 210, 0, .35); box-shadow: inset 0 0 0 6px var(--red); }
+.bingo-hole.is-line { animation: bingo-hit .5s cubic-bezier(.2, 1.6, .4, 1) both, bingo-line .6s .5s ease-in-out infinite alternate; }
+@keyframes bingo-line { from { transform: scale(1); } to { transform: scale(1.12); } }
 .bingo-win {
-  position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%) rotate(-8deg); white-space: nowrap;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-8deg); white-space: nowrap;
   font-family: 'Line', sans-serif; font-size: 120px; font-weight: 900; color: var(--red);
   -webkit-text-stroke: 12px #fff; paint-order: stroke fill; text-shadow: 0 10px 0 rgba(0, 0, 0, .18);
-  animation: found-pop .7s .2s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none;
+  animation: bingo-win .7s .2s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none;
 }
-.bingo-win { animation-name: bingo-win; }
 @keyframes bingo-win { from { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(-20deg); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg); } }
 
-/* 山札 */
-.bingo-deck {
-  width: 250px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 12px;
-  padding: 16px 12px; background: rgba(255, 255, 255, .88); border-radius: 22px; box-shadow: 0 8px 20px rgba(0, 0, 0, .18);
+/* 山札（card_1.webp 180×250）。大人は x=630、ロビンは x=1110 */
+.bingo-deck { position: absolute; top: 305px; width: 180px; height: 250px; }
+.bingo-deck.is-adult { left: 630px; }
+.bingo-deck.is-kid { left: 1110px; }
+.bingo-deck img {
+  position: absolute; left: 0; top: 0; width: 180px; height: 250px; display: block;
+  transform: translate(calc(var(--k) * -5px), calc(var(--k) * -5px));
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .25)); animation: bingo-deck-in .45s calc(var(--k) * 90ms) ease both;
 }
-.bingo-deck-title { font-size: 30px; font-weight: 900; }
-.bingo-stack { position: relative; width: 150px; height: 214px; }
-.bingo-stack i {
-  position: absolute; left: calc(var(--k) * 6px); top: calc(var(--k) * -6px); width: 140px; height: 196px;
-  border-radius: 14px; border: 6px solid #fff;
-  background: repeating-linear-gradient(45deg, var(--red) 0 14px, #d62839 14px 28px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, .25); animation: bingo-deck-in .45s calc(var(--k) * 90ms) ease both;
-}
-.bingo-deck.is-kid .bingo-stack i { background: repeating-linear-gradient(45deg, #2f6fde 0 14px, #4f8af0 14px 28px); }
-@keyframes bingo-deck-in { from { opacity: 0; transform: translateY(-80px) rotate(-10deg); } to { opacity: 1; transform: none; } }
-.bingo-stack-empty {
+@keyframes bingo-deck-in { from { opacity: 0; translate: 0 -80px; rotate: -10deg; } to { opacity: 1; translate: none; rotate: none; } }
+.bingo-deck-empty {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: pre-line; text-align: center;
-  font-size: 24px; line-height: 1.4; color: var(--ink-sub); border: 4px dashed #c4c4cc; border-radius: 14px;
+  font-size: 26px; font-weight: 900; line-height: 1.4; color: rgba(255, 255, 255, .85); border: 5px dashed rgba(255, 255, 255, .55); border-radius: 14px;
 }
-.bingo-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
-.bingo-list li { padding: 6px 8px; font-size: 25px; font-weight: 900; text-align: center; background: #f4f4f5; border-radius: 10px; animation: fade-in .4s ease both; }
-.bingo-list li.is-used { color: #a8a8b0; text-decoration: line-through; background: #e4e4e8; }
 
-/* 真ん中：めくったカードとボタン */
-.bingo-center { width: 360px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 26px; padding-top: 10px; }
-.bingo-open-slot { width: 300px; height: 400px; perspective: 1200px; }
-.bingo-face {
-  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-  padding: 24px 18px; text-align: center; background: #fff; border-radius: 22px; border: 10px solid var(--red);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, .3); animation: bingo-flip .6s ease both;
+/* 吹き出しの中身：上がロビンの山札、下が大人の山札（250〜1670 の幅） */
+.bingo-deck-list {
+  position: absolute; left: 250px; width: 1420px; height: 140px; margin: 0; padding: 0 60px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; white-space: nowrap;
+  font-family: 'Line', sans-serif; font-size: 54px; font-weight: 900; letter-spacing: .04em;
 }
-.bingo-face.is-kid { border-color: #2f6fde; }
-.bingo-face.is-empty { animation: none; border: 6px dashed rgba(255, 255, 255, .8); background: rgba(255, 255, 255, .25); box-shadow: none; color: #fff; font-size: 30px; }
-.bingo-face small { font-size: 22px; color: var(--ink-sub); }
-.bingo-face b { font-family: 'Line', sans-serif; font-size: 44px; line-height: 1.25; overflow-wrap: anywhere; }
-.bingo-face em { font-style: normal; font-family: 'Line', sans-serif; font-size: 72px; font-weight: 900; color: var(--red); }
-.bingo-face.is-kid em { color: #2f6fde; }
+.bingo-deck-list.is-kid { top: 35px; color: #9a6400; }
+.bingo-deck-list.is-adult { top: 685px; color: #0050c8; }
+.bingo-deck-list span { animation: fade-in .4s ease both; }
+.bingo-deck-list i { font-style: normal; margin: 0 .35em; }
+/* 全部が？のときは、ビンゴ１.webp のように間を広くとる */
+.bingo-deck-list.is-all-q i { margin: 0 1.6em; }
+.bingo-deck-list span.is-used { opacity: .4; text-decoration: line-through; text-decoration-thickness: 5px; }
+.bingo-deck-list span.is-used i { display: inline-block; text-decoration: none; }
+
+/* 真ん中：めくったカード（card_2.webp 180×250） */
+.bingo-open-slot { position: absolute; left: 870px; top: 305px; width: 180px; height: 250px; perspective: 1200px; }
+.bingo-face-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bingo-face {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px 10px; text-align: center; animation: bingo-flip .6s ease both;
+}
+.bingo-face small { padding: 2px 14px; font-size: 20px; font-weight: 900; color: #fff; background: #0050c8; border-radius: 999px; }
+.bingo-face.is-kid small { background: #b07a00; }
+.bingo-face b { font-family: 'Line', sans-serif; font-size: 28px; line-height: 1.2; overflow-wrap: anywhere; color: var(--ink); }
+/* 6文字以上（サッカーボール・ユビニンギョウなど）は1行に収める */
+.bingo-face b.is-long { font-size: 21px; white-space: nowrap; letter-spacing: -.02em; }
+.bingo-face em { font-style: normal; font-family: 'Line', sans-serif; font-size: 60px; font-weight: 900; line-height: 1; color: #0050c8; }
+.bingo-face.is-kid em { color: #b07a00; }
 @keyframes bingo-flip { from { transform: rotateY(90deg) scale(.9); } to { transform: none; } }
-.bingo-action { min-height: 120px; display: flex; align-items: center; justify-content: center; }
-button.bingo-flip-btn { font-size: 44px; padding: 26px 40px; white-space: nowrap; animation: guide-glow .7s ease-in-out infinite alternate; }
+/* めくったカードの下（下の吹き出しのしっぽにかからない幅） */
+.bingo-action { position: absolute; left: 770px; top: 566px; width: 380px; height: 112px; display: flex; align-items: center; justify-content: center; z-index: 2; }
+button.bingo-flip-btn { font-size: 36px; padding: 18px 30px; white-space: nowrap; animation: guide-glow .7s ease-in-out infinite alternate; }
 button.bingo-flip-btn:disabled { animation: none; }
 button.bingo-flip-btn.is-start { --edge: #1c1c1f; background: var(--charcoal); }
-.bingo-turn { padding: 16px 34px; font-size: 36px; font-weight: 900; color: #fff; background: #2f6fde; border-radius: 999px; }
-.bingo-hint { padding: 18px 24px; font-size: 30px; line-height: 1.45; text-align: center; background: rgba(255, 255, 255, .92); border-radius: 18px; }
+.bingo-turn { padding: 12px 30px; font-size: 32px; font-weight: 900; color: #fff; background: #b07a00; border-radius: 999px; white-space: nowrap; }
+.bingo-hint { padding: 12px 18px; font-size: 24px; font-weight: 700; line-height: 1.4; text-align: center; background: rgba(255, 255, 255, .92); border-radius: 16px; }
 
 /* ROUND の表示 */
 .bingo-banner {
@@ -1315,26 +1311,27 @@ button.bingo-flip-btn.is-start { --edge: #1c1c1f; background: var(--charcoal); }
 }
 
 /* ジャック機能・キモチ */
+/* 右上の「00」（noz_icon.webp）。ビンゴ１.webp の x=1755〜1885、y=35〜165 */
 button.bingo-jack {
-  position: absolute; right: 40px; top: 12px; z-index: 4; width: 116px; height: 116px; padding: 0;
-  background: #fff; border-radius: 50%; overflow: hidden;
-  box-shadow: inset 0 0 0 6px var(--charcoal), 0 6px 0 var(--charcoal);
+  position: absolute; right: 35px; top: 35px; z-index: 4; width: 130px; height: 130px; padding: 0;
+  background: none; border-radius: 50%; box-shadow: none;
   animation: pop-in .4s cubic-bezier(.2, 1.4, .4, 1) both;
 }
 .bingo-talk p { white-space: pre-line; }
 button.bingo-jack img { width: 100%; height: 100%; object-fit: contain; }
-button.bingo-jack:active { transform: translateY(6px); box-shadow: inset 0 0 0 6px var(--charcoal); }
+button.bingo-jack:active { transform: scale(.94); box-shadow: none; filter: brightness(.9); }
 .bingo-game .mood-heart.bingo-heart { bottom: 210px; }
 .modal.bingo-jack-modal { width: 1560px; padding: 36px 50px 40px; align-items: center; }
 .bingo-jack-modal h2 { display: flex; align-items: center; justify-content: center; gap: 18px; }
 .bingo-jack-modal h2 img { width: 70px; height: 70px; object-fit: contain; }
+/* ジャック機能：ロビンの画面（盤面 1920×841 を 0.75 倍） */
 .bingo-jack-view {
-  position: relative; width: 1450px; height: 520px; overflow: hidden; border-radius: 24px;
-  background: #52e0e0 center / cover no-repeat;
+  position: relative; width: 1440px; height: 631px; overflow: hidden; border-radius: 24px;
+  background: #8a3c00 top center / 100% auto no-repeat;
 }
-.bingo-jack-view .bingo-board { left: 0; right: auto; top: 14px; width: 1812px; transform: scale(.8); transform-origin: top left; }
-.bingo-jack-view .bingo-card, .bingo-jack-view .bingo-cell b, .bingo-jack-view .bingo-hit,
-.bingo-jack-view .bingo-face, .bingo-jack-view .bingo-stack i, .bingo-jack-view .bingo-win { animation: none; }
+.bingo-jack-view .bingo-board { transform: scale(.75); transform-origin: top left; }
+.bingo-jack-view .bingo-card, .bingo-jack-view .bingo-hole, .bingo-jack-view .bingo-face,
+.bingo-jack-view .bingo-deck img, .bingo-jack-view .bingo-deck-list span, .bingo-jack-view .bingo-win { animation: none; }
 .bingo-jack-view .bingo-win { transform: translate(-50%, -50%) rotate(-8deg); }
 
 /* ---------- テンキー（ナゾの解答・取り出し依頼） ---------- */
@@ -1491,16 +1488,16 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .santazon .sz-panel { width: 155px; height: 155px; background: none; box-shadow: none; border-radius: 22px; }
 .santazon .sz-ghost { width: 155px; height: 155px; background: none; box-shadow: none; }
 .santazon .sz-ghost img { width: 100%; height: 100%; }
-.santazon .sz-ghost.is-char { width: auto; height: 90px; min-width: 90px; padding: 0 20px; display: flex; align-items: center; justify-content: center; font-size: 56px; color: #fff; background: #7046ff; border-radius: 18px; }
+.santazon .sz-ghost.is-char { width: auto; height: 90px; min-width: 90px; padding: 0 20px; display: flex; align-items: center; justify-content: center; font-size: 56px; color: #ff8a1f; background: #fff; border-radius: 18px; box-shadow: 0 0 0 4px #ff8a1f, 0 8px 18px rgba(0, 0, 0, .2); }
 .santazon .sz-search-hint { font-size: 34px; color: #ff8a1f; }
 .santazon button.sz-hint-ch { color: #ff8a1f; }
 .santazon .sz-result-back { border-radius: 0; }
 /* 案内中（ステージ2）は、目立たせたところ以外は触れない */
 .santazon.is-guided .sz-cat, .santazon.is-guided .sz-item-btn, .santazon.is-guided .sz-panel, .santazon.is-guided .sz-hint-ch { pointer-events: none; }
 
-/* ---------- ソックスキーを導く（ゲーム画面。記録ボタンの上） ---------- */
+/* ---------- ソックスキーを導く（ゲーム画面。右端：記録ボタンの右端にそろえる） ---------- */
 button.sock-key-btn {
-  position: absolute; right: 232px; bottom: 210px; z-index: 5;
+  position: absolute; right: 40px; bottom: 210px; z-index: 5;
   width: 210px; height: 156px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   font-size: 21px; font-weight: 900; color: #4b14b4; background: #fff; border-radius: 24px;
   box-shadow: inset 0 0 0 5px #4b14b4, 0 8px 0 #4b14b4;
@@ -1513,6 +1510,13 @@ button.sock-key-btn:disabled svg { color: #b4b4bc; }
 
 /* ---------- 案内：周りを暗くして、そこだけ明るく ---------- */
 .spot-dim { position: absolute; z-index: 71; background: rgba(8, 8, 14, .6); animation: fade-in .3s ease both; }
+/* 案内の矢印（スポットライトの上に出す）。先の位置はそのままで、上下にゆれる */
+.guide-arrow {
+  position: absolute; z-index: 72; width: 120px; height: 150px; pointer-events: none; overflow: visible;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45));
+  animation: fade-in .3s ease both, guide-arrow-bob .6s ease-in-out infinite alternate;
+}
+@keyframes guide-arrow-bob { from { transform: translateY(-22px); } to { transform: translateY(0); } }
 .spot-ring { position: absolute; z-index: 71; pointer-events: none; border-radius: 20px; box-shadow: 0 0 0 6px #ffd400, 0 0 30px 10px rgba(255, 212, 0, .6); animation: guide-glow .7s ease-in-out infinite alternate; }
 .guide-talk p { white-space: pre-line; }
 .guide-talk p .hl, .hide-elf p .hl { color: var(--red); font-weight: 900; }
@@ -1536,20 +1540,6 @@ button.room-area { position: absolute; z-index: 2; padding: 0; background: trans
 button.room-area:active { transform: none; box-shadow: none; background: rgba(255, 255, 255, .15); }
 button.room-area.is-debug { background: rgba(var(--red-rgb), .18); box-shadow: inset 0 0 0 4px var(--red); }
 button.room-area.is-debug span { position: absolute; left: 6px; top: 6px; padding: 2px 10px; font-size: 22px; color: #fff; background: var(--red); border-radius: 8px; }
-
-/* ステージ4：めくったカードの記録（盤面の下） */
-.bingo-log { position: absolute; left: 40px; right: 40px; top: 760px; display: flex; align-items: center; justify-content: flex-start; gap: 14px; pointer-events: none; }
-.bingo-log-title { flex: none; padding: 8px 18px; font-size: 24px; font-weight: 900; color: #fff; background: var(--charcoal); border-radius: 999px; }
-.bingo-log-card {
-  flex: none; width: 190px; height: 150px; padding: 8px 8px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  text-align: center; background: #fff; border: 6px solid var(--red); border-radius: 14px; box-shadow: 0 6px 12px rgba(0, 0, 0, .25);
-  animation: bingo-flip .5s ease both;
-}
-.bingo-log-card.is-kid { border-color: #2f6fde; }
-.bingo-log-card small { font-size: 16px; color: var(--ink-sub); }
-.bingo-log-card b { font-family: 'Line', sans-serif; font-size: 24px; line-height: 1.2; overflow-wrap: anywhere; }
-.bingo-log-card em { font-style: normal; font-family: 'Line', sans-serif; font-size: 32px; font-weight: 900; color: var(--red); }
-.bingo-log-card.is-kid em { color: #2f6fde; }
 
 /* ---------- セリフのテキストボックス：すべて3行ぶんの高さで固定。短いときは一番上の行から ---------- */
 /* 会話パート（NovelPart）：50px × 行の高さ1.5 × 3行 */
@@ -1582,3 +1572,50 @@ button.room-area.is-debug span { position: absolute; left: 6px; top: 6px; paddin
 .task-mood h3 { margin: 0 0 12px; font-size: 34px; font-weight: 900; color: #d62839; }
 .task-mood p { margin: 0 0 10px; font-size: 38px; font-weight: 900; line-height: 1.5; }
 .task-mood p small { display: block; font-size: 26px; color: var(--ink-sub); }
+
+/* セリフ編集：中央に出す画像 */
+.script-image-thumb { display: block; width: 72px; height: 48px; border-radius: 6px; overflow: hidden; background: #eee; box-shadow: inset 0 0 0 1px #ccc; }
+.script-image-thumb img { width: 100%; height: 100%; object-fit: contain; }
+/* 会話の中央の画像は、3行のテキストボックス（上端 y≒660）にかからないところに置く */
+.play-area .novel-slide { top: 34%; max-height: 470px; max-width: 1200px; width: auto; }
+
+/* ゲーム画面の会話と一緒に、真ん中に出す画像（セリフ編集の「画像」） */
+.game-slide {
+  position: absolute; left: 50%; top: 42%; z-index: 72; max-width: 1200px; max-height: 560px; object-fit: contain;
+  transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .3));
+  animation: slide-in .8s ease both;
+}
+
+/* セリフ編集：場面のタブ・表示名・位置 */
+.script-subtabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.catalog-page .script-subtabs button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 14px; font-size: 15px; font-weight: 900;
+  color: var(--ink); background: #fff; border-radius: 10px; box-shadow: inset 0 0 0 2px #ddd;
+}
+.catalog-page .script-subtabs button small { font-size: 11px; color: var(--ink-sub); }
+.catalog-page .script-subtabs button.on { color: #fff; background: var(--charcoal); box-shadow: none; }
+.catalog-page .script-subtabs button.on small { color: #ccc; }
+.catalog-page .script-subtabs button i { font-style: normal; color: #ff8a1f; font-size: 12px; }
+.catalog-page .script-subtabs button em { font-style: normal; font-size: 11px; color: #2a9d5c; }
+.catalog-page .script-subtabs button.on em { color: #8fe0b0; }
+.catalog-page .script-name { width: 200px; padding: 6px 8px; font-size: 14px; }
+.script-pos { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 900; color: var(--ink-sub); }
+.catalog-page .script-pos select { padding: 6px 8px; font-size: 14px; }
+.script-scene-note { margin: 0 0 12px; }
+
+/* ステージ2：ラウンド1のあいだ、右上に小さく出すエルフのヒント */
+.hide-corner-hint { position: absolute; right: 24px; top: 20px; z-index: 4; display: flex; align-items: flex-start; gap: 8px; pointer-events: none; animation: pop-in .4s ease both; }
+.hide-corner-hint img { width: 110px; height: 130px; flex: none; object-fit: contain; object-position: center top; }
+.hide-corner-hint p {
+  position: relative; margin: 14px 0 0; max-width: 880px; padding: 14px 20px; white-space: pre-line;
+  font-family: 'Line', sans-serif; font-size: 26px; font-weight: 900; line-height: 1.45; color: var(--ink);
+  background: #fff; border: 3px solid var(--charcoal); border-radius: 16px; box-shadow: 0 6px 16px rgba(0, 0, 0, .2);
+}
+.hide-corner-hint p::after { content: ''; position: absolute; right: -14px; top: 26px; border: 8px solid transparent; border-left: 10px solid var(--charcoal); }
+.hide-corner-hint p .hl { color: var(--red); }
+
+/* ステージ2：アミーのアイコンの下の説明 */
+.hide-kid-label {
+  position: absolute; right: 248px; width: 200px; bottom: 172px; z-index: 4; text-align: center; pointer-events: none;
+  font-size: 20px; font-weight: 900; color: var(--ink); text-shadow: 0 0 4px #fff, 0 0 4px #fff;
+}

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { KV_IMAGE } from '../config'
-import { characterImage } from '../scenario'
+import { hl, useLineSound } from '../components/GameTalk'
+import { lineImage } from '../script/gameScenes'
+import { useGameLines } from '../script/scriptData'
 import type { GameProps } from './index'
 
 /** ステージ1：マークの点数当て。点数は 0〜9 の一桁 */
@@ -20,20 +22,8 @@ const KEYS = [...DIGIT_KEYS, ...ACTION_KEYS] as const
 /** 入力できる最大桁数 */
 const MAX_DIGITS = 9
 
-/** 案内役のエルフの台詞。画面下のテキストボックスに出す（wrong は複数の吹き出しを、タップで送る） */
-const GUIDE = {
-  start: ['マークを選んで得点を入力しよう。'],
-  picking: ['マークを選んで得点を入力しよう。'],
-  // 1回目の不正解だけ
-  wrongFirst: [
-    'あの……大人の皆さんに言うのもアレなんですが……\n答えが違ってるところがありますよ……',
-    '本当は自己責任なゲームなんですからね。',
-    'うっかりミスでリンさんが楽しめないとマズいから、\nこっそり教えているんです。しっかりしてください。',
-  ],
-  wrong: ['もう一度考えてみましょう。'],
-  right: ['その調子！'],
-  done: ['すべて分かったね！すごい！'],
-} as const
+/** 案内役のエルフの台詞の種類。台詞は script/gameScenes.ts（セリフ編集の「マーク当て中」など） */
+type Guide = 'start' | 'picking' | 'wrongFirst' | 'wrong' | 'right' | 'done'
 
 const ALL_SOLVED = Object.fromEntries(MARKS.map((m) => [m.id, m.answer])) as Partial<Record<MarkId, number>>
 
@@ -41,10 +31,22 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
   const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : {})
   const [selected, setSelected] = useState<MarkId | null>(null)
   const [input, setInput] = useState('')
-  const [guide, setGuide] = useState<keyof typeof GUIDE>('start')
+  const [guide, setGuide] = useState<Guide>('start')
+  const mark = useGameLines('st1-mark')
+  const missFirst = useGameLines('st1-mark-miss1')
+  const miss = useGameLines('st1-mark-miss')
+  // 0=最初・選んだとき / 1=正解 / 2=全部わかった（マーク当て中）、不正解は別の場面
+  const GUIDE: Record<Guide, typeof mark> = {
+    start: mark.slice(0, 1),
+    picking: mark.slice(0, 1),
+    right: mark.slice(1, 2),
+    done: mark.slice(2, 3),
+    wrongFirst: missFirst,
+    wrong: miss,
+  }
   const [guideIdx, setGuideIdx] = useState(0)
   const missed = useRef(false)
-  const say = (g: keyof typeof GUIDE) => {
+  const say = (g: Guide) => {
     setGuide(g)
     setGuideIdx(0)
   }
@@ -94,7 +96,8 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
     }
   }
 
-  const elfEmotion = guide === 'wrong' || guide === 'wrongFirst' ? '哀' : guide === 'right' || guide === 'done' ? '喜' : '真顔'
+  const speak = GUIDE[guide][Math.min(guideIdx, GUIDE[guide].length - 1)]
+  useLineSound(speak)
 
   return (
     <div className="game mark-game">
@@ -134,15 +137,16 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
         </div>
       </div>
       {/* すべて分かったあとは、続きの説明（画面の上に出る会話）に任せる */}
-      {!allDone && (
+      {!allDone && speak?.slide && <img className="game-slide" src={speak.slide} alt="" />}
+      {!allDone && speak && (
         <div className="mark-speak">
-          <img className="mark-speak-icon" src={characterImage('Common', elfEmotion)} alt="" />
+          <img className="mark-speak-icon" src={lineImage(speak)} alt="" />
           <div
             className={`mark-speak-box${guideIdx + 1 < GUIDE[guide].length ? ' is-more' : ''}`}
             key={`${guide}${guideIdx}`}
             onClick={() => setGuideIdx((i) => Math.min(i + 1, GUIDE[guide].length - 1))}
           >
-            {GUIDE[guide][guideIdx]}
+            {hl(speak.text)}
           </div>
         </div>
       )}

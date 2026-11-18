@@ -50,6 +50,7 @@ interface Row {
   available: string
   stock: string
   listed: boolean
+  hasDetail: boolean
   description: string
   image: string
   note: string
@@ -62,6 +63,7 @@ const EMPTY_ROW: Row = {
   available: '1',
   stock: '1',
   listed: true,
+  hasDetail: true,
   description: '',
   image: '',
   note: '',
@@ -75,6 +77,7 @@ function toRow(p: Product): Row {
     available: String(p.available),
     stock: String(p.stock),
     listed: p.listed,
+    hasDetail: p.hasDetail,
     description: p.description,
     image: p.image ?? '',
     note: p.note ?? '',
@@ -98,6 +101,7 @@ function toInput(r: Row): ProductInput {
     available: Number(r.available),
     stock: Number(r.stock),
     listed: r.listed,
+    hasDetail: r.hasDetail,
     description: r.description,
     image: r.image,
     note: r.note,
@@ -114,6 +118,7 @@ const COLUMNS = [
   { key: 'available', label: '在庫（今）' },
   { key: 'stock', label: '在庫（全体）' },
   { key: 'listed', label: 'リスト掲載' },
+  { key: 'hasDetail', label: '詳細ボタン' },
   { key: 'description', label: 'アイテムの詳細説明' },
   { key: 'image', label: '画像' },
   { key: 'note', label: '備考' },
@@ -153,6 +158,7 @@ function parsePaste(text: string): { rows: ProductInput[]; errors: string[] } {
         available: (cells[3] ?? '').trim(),
         stock: (cells[4] ?? '').trim(),
         listed: !/^(なし|無|no|false|0|×)$/i.test((cells[5] ?? '').trim()),
+        hasDetail: true,
         description: (cells[6] ?? '').trim(),
         image: '',
         note: (cells[7] ?? '').trim(),
@@ -227,7 +233,7 @@ export default function CatalogScreen({ onBack }: { onBack: () => void }) {
       <div className="catalog-page">
         <header className="catalog-header">
           <div>
-            <h1>商品登録</h1>
+            <h1>アイテム登録</h1>
             <p>セルを直接書き換えると、セルを離れたときに保存されます。Enter・↑↓で上下のセルへ移動します。</p>
           </div>
           <div className="catalog-header-actions">
@@ -469,6 +475,12 @@ function SheetRow({
         <label>
           <input type="checkbox" checked={row.listed} onChange={(e) => set('listed', e.target.checked, true)} />
           {row.listed ? 'あり' : 'なし'}
+        </label>
+      </td>
+      <td className="col-hasDetail">
+        <label>
+          <input type="checkbox" checked={row.hasDetail} onChange={(e) => set('hasDetail', e.target.checked, true)} />
+          {row.hasDetail ? 'あり' : 'なし'}
         </label>
       </td>
       <td className="col-description">{text('description')}</td>

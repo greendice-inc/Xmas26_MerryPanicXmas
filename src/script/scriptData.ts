@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { getBackend } from '../net'
 import {
   CLEAR,
@@ -8,11 +8,13 @@ import {
   masterElfImage,
   st2Silhouette,
   ST2_KIDS,
+  DUMMY_IMAGE,
   type Emotion,
   type Mood,
   type NovelLine,
   type NovelScene,
 } from '../scenario'
+import * as G from './gameScenes'
 
 /**
  * セリフ編集（?debug=true の /script）で作るデータ。
@@ -39,13 +41,17 @@ export interface ScriptLine {
   id: string
   kind: LineKind
   char?: string
+  /** 表示する名前（空ならキャラの名前。「？？？」「リン（心の声）」など） */
+  name?: string
+  /** ゲーム画面の会話の位置 */
+  pos?: 'bottom' | 'top' | 'shop'
   emotion?: Emotion
   text: string
   size?: 'sm' | 'md' | 'lg'
   /** 効果音・音声。public のパスか「sound:<id>」 */
   se?: string
   voice?: string
-  /** 台詞と一緒に中央へ出す画像 */
+  /** 台詞と一緒に中央へ出す画像。public のパスか「image:<id>」 */
   slide?: string
   image?: string
   mood?: Mood
@@ -57,27 +63,67 @@ export interface ScriptSound {
   data: string
 }
 
+/** セリフと一緒に画面の中央へ出す画像（アップロードしたもの）。セリフからは「image:<id>」で指す */
+export type ScriptImage = ScriptSound
+
 export interface SceneDef {
   id: string
   /** タブ（Stage1 など） */
   tab: string
   label: string
   base: NovelScene
+  /** ゲーム画面の中で話す（上・下を選べる） */
+  game?: boolean
+  /** 行に演出が結びついているので、行の数・順番を変えられない */
+  fixed?: boolean
+  /** 決まった枠に出すので、上・下を選べない（マーク当ての下の枠） */
+  noPos?: boolean
 }
 
 export const SCRIPT_TABS = ['Stage1', 'Stage2', 'Stage3', 'Stage4', 'StageF'] as const
 
-/** 編集できる場面 */
+const game = (id: string, tab: string, label: string, base: NovelScene, more: Partial<SceneDef> = {}): SceneDef => ({
+  id,
+  tab,
+  label,
+  base,
+  game: true,
+  ...more,
+})
+
+/** 編集できる場面。並びはゲームで出てくる順 */
 export const SCENES: SceneDef[] = [
   { id: 'st1-intro', tab: 'Stage1', label: '導入', base: NOVEL[0] },
+  game('st1-mark', 'Stage1', 'マーク当て中', G.ST1_MARK, { fixed: true, noPos: true }),
+  game('st1-mark-miss1', 'Stage1', 'マーク当て：1回目の不正解', G.ST1_MARK_MISS_FIRST, { noPos: true }),
+  game('st1-mark-miss', 'Stage1', 'マーク当て：2回目からの不正解', G.ST1_MARK_MISS, { noPos: true }),
+  game('st1-rules', 'Stage1', 'マーク当てのあと（Santazonの説明）', G.ST1_RULES, { fixed: true }),
+  game('st1-sock', 'Stage1', '正しい注文のあと（ソックスキー）', G.ST1_SOCK, { fixed: true }),
   { id: 'st2-intro', tab: 'Stage2', label: '導入', base: NOVEL[1] },
+  game('st2-tutorial', 'Stage2', 'リスト追加検索の案内', G.ST2_TUTORIAL, { fixed: true }),
+  game('st2-miss', 'Stage2', '違う場所を選んだとき', G.ST2_MISS, { fixed: true }),
+  game('st2-amy', 'Stage2', 'ラウンド1のあと（アミー）', G.ST2_AMY, { fixed: true }),
+  game('st2-jimmy', 'Stage2', 'ラウンド2のあと（ジミー）', G.ST2_JIMMY, { fixed: true }),
+  game('st2-tommy', 'Stage2', 'ダミーを選んだとき', G.ST2_TOMMY),
   { id: 'st2-clear', tab: 'Stage2', label: 'クリア後', base: CLEAR[1] },
   { id: 'st3-intro', tab: 'Stage3', label: '導入', base: NOVEL[2] },
+  game('st3-rule', 'Stage3', 'ルール説明', G.ST3_RULE, { fixed: true }),
+  game('st3-after-g1', 'Stage3', 'ラウンド1のあと', G.ST3_AFTER_G1),
+  game('st3-after-g2', 'Stage3', 'ラウンド2のあと（部屋のお題）', G.ST3_AFTER_G2, { fixed: true }),
+  game('st3-chair', 'Stage3', 'ナゾを解いたあと（イス）', G.ST3_CHAIR),
+  { id: 'st3-clear', tab: 'Stage3', label: 'クリア後', base: CLEAR[2] },
   { id: 'st4-intro', tab: 'Stage4', label: '導入', base: NOVEL[3] },
-  { id: 'st4-clear', tab: 'Stage4', label: 'クリア後', base: CLEAR[3] },
+  game('st4-tutorial', 'Stage4', 'チュートリアル（説明）', G.ST4_TUTORIAL, { fixed: true }),
+  game('st4-tutorial-bingo', 'Stage4', 'チュートリアル（ビンゴのあと）', G.ST4_TUTORIAL_BINGO),
+  game('st4-jack', 'Stage4', 'ジャック機能の解放', G.ST4_JACK),
+  game('st4-sock', 'Stage4', '取り出し依頼のあと', G.ST4_SOCK, { fixed: true }),
+  game('st4-r1-end', 'Stage4', 'ROUND1のあと', G.ST4_R1_END),
+  game('st4-r2-end', 'Stage4', 'ROUND2のあと', G.ST4_R2_END),
   { id: 'st5-intro', tab: 'StageF', label: 'LAST導入', base: NOVEL[4] },
+  game('st5-extract', 'StageF', '取り出し依頼のあと', G.ST5_EXTRACT, { fixed: true }),
   { id: 'st5-clear', tab: 'StageF', label: 'マスターエルフ', base: CLEAR[4] },
-  { id: 'stF-ending', tab: 'StageF', label: 'エンディング', base: ENDING },
+  game('st5-end1', 'StageF', '最後：ボールを入れる', G.ST5_END_1),
+  game('st5-end2', 'StageF', '最後：勝者の発表', G.ST5_END_2),
 ]
 
 /** ステージと場面（会話 / クリア / エンディング）から、編集できる場面の id */
@@ -94,7 +140,7 @@ const sameImage = (src: string): ScriptChar['images'] => Object.fromEntries(EMOT
 /** 今のコードにいるキャラ */
 export const DEFAULT_CHARS: ScriptChar[] = [
   { id: 'elf', name: 'エルフ', note: '案内役', images: folderImages('Common') },
-  { id: 'st1', name: '子供', note: 'ステージ1', images: folderImages('Stage1') },
+  { id: 'st1', name: 'リン', note: 'ステージ1', images: folderImages('Stage1') },
   {
     id: 'st2s',
     name: 'アミー・ジミー・トミー',
@@ -105,6 +151,7 @@ export const DEFAULT_CHARS: ScriptChar[] = [
   { id: 'amy', name: 'アミー', note: 'ステージ2', images: sameImage(ST2_KIDS.amy.image) },
   { id: 'jimmy', name: 'ジミー', note: 'ステージ2', images: sameImage(ST2_KIDS.jimmy.image) },
   { id: 'tommy', name: 'トミー', note: 'ステージ2', images: sameImage(ST2_KIDS.tommy.image) },
+  { id: 'dummy', name: 'ダミー', note: 'ステージ2（？）', images: sameImage(DUMMY_IMAGE) },
   { id: 'st3', name: 'カイ・メイ', note: 'ステージ3', images: folderImages('Stage3') },
   { id: 'st4', name: 'ロビン', note: 'ステージ4', images: folderImages('Stage4') },
   { id: 'stF', name: 'ルドリー', note: 'LAST', images: folderImages('StageF') },
@@ -120,6 +167,18 @@ const FOLDER_CHAR: Record<string, string> = {
   StageF: 'stF',
 }
 
+/** 立ち絵を直接指定している台詞のキャラ（シルエット・兄弟ひとりずつ・マスターエルフ） */
+function charOfSrc(src: string | undefined): string | undefined {
+  if (!src) return undefined
+  if (src.includes('silhouette')) return 'st2s'
+  if (src.includes('master_elf')) return 'master'
+  if (src === DUMMY_IMAGE) return 'dummy'
+  if (src === ST2_KIDS.amy.image) return 'amy'
+  if (src === ST2_KIDS.jimmy.image) return 'jimmy'
+  if (src === ST2_KIDS.tommy.image) return 'tommy'
+  return undefined
+}
+
 export const newId = () => Math.random().toString(36).slice(2, 10)
 
 /** コードに書かれた場面を、編集用の行にする */
@@ -129,11 +188,15 @@ export function linesFromScene(scene: NovelScene): ScriptLine[] {
     if (l.mood) return { id, kind: 'mood', text: '', mood: l.mood }
     if (l.banner) return { id, kind: 'banner', text: l.banner }
     const folder = l.character ?? scene.character ?? ''
-    const char = l.charSrc?.includes('silhouette') ? 'st2s' : FOLDER_CHAR[folder] ?? 'elf'
+    const char = charOfSrc(l.charSrc) ?? FOLDER_CHAR[folder] ?? 'elf'
+    const base = DEFAULT_CHARS.find((c) => c.id === char)
     return {
       id,
       kind: 'talk',
       char,
+      // キャラの名前と違う表示名（？？？ など）は残す
+      name: l.speaker && l.speaker !== base?.name ? l.speaker : undefined,
+      pos: l.pos,
       emotion: l.emotion ?? '真顔',
       text: l.text,
       size: l.size,
@@ -155,6 +218,7 @@ export interface ScriptState {
   /** 保存済みの場面（無いものはコードのまま） */
   savedScenes: Record<string, ScriptLine[]>
   sounds: ScriptSound[]
+  images: ScriptImage[]
   /** 保存済みのキャラ id */
   savedChars: Set<string>
 }
@@ -163,19 +227,39 @@ type Doc =
   | ({ kind: 'char'; deleted?: boolean; order?: number } & ScriptChar)
   | { kind: 'scene'; lines: ScriptLine[] }
   | ({ kind: 'sound' } & ScriptSound)
+  | ({ kind: 'image' } & ScriptImage)
 
 const COL = 'script'
 
+/**
+ * script コレクションは、アプリ全体で1つだけ購読して共有する。
+ * 画面ごとに購読すると、あとから出たゲーム画面が読み込み前（コードのセリフ）で会話を始めてしまうため
+ */
+let scriptDocs: Record<string, Doc> | null = null
+let scriptStop: (() => void) | null = null
+const scriptListeners = new Set<() => void>()
+function subscribeScript(cb: () => void) {
+  scriptListeners.add(cb)
+  if (!scriptStop)
+    scriptStop = getBackend().watchCol<Doc>(COL, (all) => {
+      scriptDocs = all
+      scriptListeners.forEach((l) => l())
+    })
+  return () => {
+    scriptListeners.delete(cb)
+  }
+}
+
 /** script コレクションを読む */
 export function useScript(): ScriptState {
-  const [all, setAll] = useState<Record<string, Doc> | null>(null)
-  useEffect(() => getBackend().watchCol<Doc>(COL, setAll), [])
+  const all = useSyncExternalStore(subscribeScript, () => scriptDocs)
   return useMemo(() => {
     const docs = all ?? {}
     const savedChars = new Set<string>()
     const charDocs = new Map<string, Doc & { kind: 'char' }>()
     const savedScenes: Record<string, ScriptLine[]> = {}
     const sounds: ScriptSound[] = []
+    const images: ScriptImage[] = []
     for (const [key, d] of Object.entries(docs)) {
       if (!d) continue
       if (d.kind === 'char') {
@@ -183,6 +267,7 @@ export function useScript(): ScriptState {
         savedChars.add(d.id)
       } else if (d.kind === 'scene' && Array.isArray(d.lines)) savedScenes[key.replace(/^scene-/, '')] = d.lines
       else if (d.kind === 'sound') sounds.push({ id: d.id, name: d.name, data: d.data })
+      else if (d.kind === 'image') images.push({ id: d.id, name: d.name, data: d.data })
     }
     // 最初からいるキャラは保存で上書き。足したキャラは後ろに並べる
     const chars: ScriptChar[] = []
@@ -196,7 +281,8 @@ export function useScript(): ScriptState {
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     chars.push(...added.map(strip))
     sounds.sort((a, b) => a.name.localeCompare(b.name, 'ja'))
-    return { loaded: !!all, chars, savedScenes, sounds, savedChars }
+    images.sort((a, b) => a.name.localeCompare(b.name, 'ja'))
+    return { loaded: !!all, chars, savedScenes, sounds, images, savedChars }
   }, [all])
 }
 
@@ -218,6 +304,14 @@ export const saveScene = (id: string, lines: ScriptLine[]) =>
 export const resetScene = (id: string) => getBackend().remove(COL, `scene-${id}`)
 export const saveSound = (s: ScriptSound) => getBackend().set(COL, `sound-${s.id}`, { kind: 'sound', ...s, updatedAt: Date.now() })
 export const deleteSound = (id: string) => getBackend().remove(COL, `sound-${id}`)
+export const saveImage = (s: ScriptImage) => getBackend().set(COL, `image-${s.id}`, { kind: 'image', ...s, updatedAt: Date.now() })
+
+/** 「image:<id>」を表示できる URL にする（public のパスはそのまま） */
+export function imageUrl(ref: string | undefined, images: ScriptImage[]): string | undefined {
+  if (!ref) return undefined
+  if (ref.startsWith('image:')) return images.find((s) => s.id === ref.slice(6))?.data
+  return ref
+}
 
 /** 「sound:<id>」を再生できる URL にする */
 export function soundUrl(ref: string | undefined, sounds: ScriptSound[]): string | undefined {
@@ -227,22 +321,23 @@ export function soundUrl(ref: string | undefined, sounds: ScriptSound[]): string
 }
 
 /** 場面の行（保存済み or コード）を、ゲームで流す形にする */
-export function toNovelScene(def: SceneDef, lines: ScriptLine[], chars: ScriptChar[], sounds: ScriptSound[]): NovelScene {
+export function toNovelScene(def: SceneDef, lines: ScriptLine[], chars: ScriptChar[], sounds: ScriptSound[], images: ScriptImage[] = []): NovelScene {
   return {
     background: def.base.background,
     character: def.base.character,
     lines: lines.map((l): NovelLine => {
-      const extra = { se: soundUrl(l.se, sounds), voice: soundUrl(l.voice, sounds) }
+      // 中央の画像は、セリフ・中央の文字・キモチのどれにも付けられる
+      const extra = { se: soundUrl(l.se, sounds), voice: soundUrl(l.voice, sounds), slide: imageUrl(l.slide, images) }
       if (l.kind === 'mood' && l.mood) return { speaker: '', text: '', mood: l.mood, ...extra }
       if (l.kind === 'banner') return { speaker: '', text: '', banner: l.text, ...extra }
       const c = chars.find((x) => x.id === l.char)
       return {
-        speaker: c?.name ?? '',
+        speaker: l.name || c?.name || '',
+        pos: l.pos,
         text: l.text,
         emotion: l.emotion,
         size: l.size,
         charSrc: charImage(c, l.emotion),
-        slide: l.slide,
         image: l.image,
         ...extra,
       }
@@ -267,6 +362,21 @@ export function useScriptScene(stage: number, phase: 'novel' | 'clear' | 'end' |
     const def = SCENES.find((s) => s.id === id)
     if (!def || !id) return null
     if (!state.savedScenes[id] && state.savedChars.size === 0) return null
-    return toNovelScene(def, sceneLines(id, state), state.chars, state.sounds)
+    return toNovelScene(def, sceneLines(id, state), state.chars, state.sounds, state.images)
   }, [state, stage, phase])
+}
+
+/**
+ * ゲーム画面の中のセリフ。セリフ編集で保存していればそちら、無ければ gameScenes.ts のまま。
+ * 行の数を変えられない場面（fixed）は、足りない行をコードのセリフで埋める
+ */
+export function useGameLines(id: string): NovelLine[] {
+  const state = useScript()
+  return useMemo(() => {
+    const def = SCENES.find((s) => s.id === id)
+    if (!def) return []
+    if (!state.savedScenes[id] && state.savedChars.size === 0) return def.base.lines
+    const lines = toNovelScene(def, sceneLines(id, state), state.chars, state.sounds, state.images).lines
+    return def.fixed ? def.base.lines.map((d, i) => lines[i] ?? d) : lines
+  }, [state, id])
 }

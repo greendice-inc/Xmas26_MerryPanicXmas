@@ -15,6 +15,8 @@ export interface ProductInput {
   available: number
   listed: boolean
   description: string
+  /** false = 詳細ボタンを出さない */
+  hasDetail: boolean
   /** 空なら画像なし。データURL */
   image: string
   note: string
@@ -29,6 +31,7 @@ interface Stored {
   available?: number
   listed?: boolean
   description?: string
+  hasDetail?: boolean
   image?: string
   note?: string
   updatedAt?: number
@@ -70,6 +73,8 @@ function toProduct(id: string, d: Stored): Product | null {
     available: d.available == null ? stock : (whole(d.available) ?? 0),
     listed: !!d.listed,
     description: d.description ?? '',
+    // 未設定の古い商品は、これまで通り詳細ボタンあり
+    hasDetail: d.hasDetail !== false,
     image: d.image || undefined,
     note: d.note ?? '',
   }
@@ -122,6 +127,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       available: input.available,
       listed: input.listed,
       description: input.description.trim(),
+      hasDetail: input.hasDetail,
       image: input.image,
       note: input.note.trim(),
       updatedAt: Date.now(),
@@ -142,6 +148,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
         available: p.available,
         listed: p.listed,
         description: p.description,
+        hasDetail: p.hasDetail,
         image: p.image ?? '',
         note: p.note ?? '',
         updatedAt: Date.now(),
@@ -152,7 +159,9 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
   const importMany = async (rows: ProductInput[]) => {
     let added = 0
     let updated = 0
-    const known = new Map<string, { id: string; image: string }>(stored.map((p) => [`${p.category}:${p.code}`, { id: p.id, image: p.image ?? '' }] as const))
+    const known = new Map<string, { id: string; image: string; hasDetail: boolean }>(
+      stored.map((p) => [`${p.category}:${p.code}`, { id: p.id, image: p.image ?? '', hasDetail: p.hasDetail }] as const),
+    )
     for (const input of rows) {
       const key = `${input.category}:${input.code}`
       const hit = known.get(key)
@@ -165,6 +174,8 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
         available: input.available,
         listed: input.listed,
         description: input.description.trim(),
+        // 貼り付けには詳細ボタンの列がないので、登録済みの商品は今の設定のまま
+        hasDetail: hit ? hit.hasDetail : input.hasDetail,
         image: input.image || hit?.image || '',
         note: input.note.trim(),
         updatedAt: Date.now(),
@@ -172,7 +183,7 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
       if (hit) updated += 1
       else {
         added += 1
-        known.set(key, { id, image: input.image || '' })
+        known.set(key, { id, image: input.image || '', hasDetail: input.hasDetail })
       }
     }
     return { added, updated }

@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import AreaEditor from '../components/AreaEditor'
-import { characterImage, ST3_NAME, st3GameImage, type Emotion } from '../scenario'
+import GameTalk from '../components/GameTalk'
+import { st3GameImage, type NovelLine } from '../scenario'
+import { useGameLines } from '../script/scriptData'
 import { DEFAULT_WORD, type TeamDoc, type WordProgress } from '../types'
 import { resetWordAreas, saveWordAreas, useWordAreas, wordAreasToCode, type WordArea } from './wordAreas'
 
@@ -10,42 +12,22 @@ const CLEAR_MS = 2600
 /** 「せいかい！」「最初から！」を見せる長さ */
 const FLASH_MS = 1300
 
-interface Line {
-  who: 'elf' | 'kaimei'
-  text: string
-  emotion?: Emotion
-}
-const elf = (text: string, emotion?: Emotion): Line => ({ who: 'elf', text, emotion })
-const km = (text: string, emotion?: Emotion): Line => ({ who: 'kaimei', text, emotion })
+/** 会話の台詞は script/gameScenes.ts（セリフ編集の「ルール説明」など） */
+type Line = NovelLine
+const ROOM_GOAL = '必要なアイテムがあれば、発送してから部屋に向かおう。'
+const CHAIR_GOAL = 'イスの上に立つのは禁止。イスの上にモノを置くのは大丈夫。'
 
-/** ゲーム画面に入ってすぐの、エルフのルール説明 */
-const RULE: Line[] = [
-  elf('このゲームのルールを説明するよ。'),
-  elf('まず、画面に指で押さえる4文字のワードが表示されます。'),
-  elf('一人2本ずつ押さえましょう。'),
-  elf('次に、現在のワードから一文字変えたワードが表示されます。'),
-  elf('そうしたら、変化した単語を指で押さえます。'),
-  elf('このとき、変わっていない文字を押さえている指は画面から離してはいけません。'),
-  elf('五回連続で成功できたらクリアです。', '楽'),
-  elf('説明を見たかったら、後ろにあるラミネートをもらってね。'),
-  elf('それでは、1ゲーム目を始めていきましょう。', '楽'),
-]
-const AFTER_G1: Line[] = [km('すごい！2ゲーム目はもっと難しいよ！', '喜')]
-const AFTER_G2: Line[] = [
-  km('すごいすごい！', '喜'),
-  km('じゃあ次は、実際に部屋でアシでやってみよう！', '楽'),
-  km('問題はこれだよ！今回は難しいから、お題は一個だけ！', '楽'),
-]
-/** 正しい注文を確定した瞬間に止めに入る */
-const CHAIR: Line[] = [
-  km('さっき部屋で押さえてワードをして遊んでたら、エルフに', '哀'),
-  km('椅子に上るのは危ないから今後禁止！', '怒'),
-  km('って怒られちゃったんだ。', '哀'),
-  km('今注文したものだけでクリアできる予定だったんだけど、どうしよう…', '哀'),
-]
-const ROOM_GOAL = 'クリアする方法が分かったら部屋に向かってね！'
-const CHAIR_GOAL = 'この状況でクリアする方法が分かったら、もう一度注文をして部屋に向かおう。'
-const CHAIR_DIALOGS = ['画面に表示されている青い丸は椅子だったようだ。', CHAIR_GOAL]
+/** ルール説明（st3-rule）の行ごとに見せる見本。「テブクロ → ネブクロ → クロネコ」 */
+const RULE_DEMO: Record<number, { label: string; word: string }> = {
+  1: { label: '押さえるワード', word: 'テブクロ' },
+  2: { label: '押さえるワード', word: 'テブクロ' },
+  3: { label: '問題', word: '眠る時に使うもの' },
+  4: { label: '問題', word: '眠る時に使うもの' },
+  5: { label: '答え', word: 'ネブクロ' },
+  6: { label: '答え', word: 'クロネコ' },
+}
+/** ラウンド2のあと（st3-after-g2）で、この行から部屋の画面を見せる */
+const ROOM_FROM = 4
 /** 部屋でやるお題 */
 const THEME = 'クリスマスツリー'
 
@@ -124,6 +106,10 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
   const overlay = (node: ReactNode) => (host ? createPortal(node, host) : null)
 
   // ---------- 会話とダイアログ ----------
+  const RULE = useGameLines('st3-rule')
+  const AFTER_G1 = useGameLines('st3-after-g1')
+  const AFTER_G2 = useGameLines('st3-after-g2')
+  const CHAIR = useGameLines('st3-chair')
   const [talk, setTalk] = useState<{ lines: Line[]; idx: number; then?: () => void } | null>(null)
   const [dialog, setDialog] = useState<{ texts: string[]; idx: number; then?: () => void } | null>(null)
   const [clearFx, setClearFx] = useState(false)
@@ -140,7 +126,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
     setTalk({
       lines: CHAIR,
       idx: 0,
-      then: () => setDialog({ texts: CHAIR_DIALOGS, idx: 0, then: onChairDone }),
+      then: onChairDone,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chair])
@@ -151,6 +137,13 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
     setTalk(null)
     talk.then?.()
   }
+  // セリフ編集で台詞を全部消した場面は、すぐ次へ
+  useEffect(() => {
+    if (talk && !talk.lines[talk.idx]) {
+      setTalk(null)
+      talk.then?.()
+    }
+  })
   const nextDialog = () => {
     if (!dialog) return
     if (dialog.idx + 1 < dialog.texts.length) return setDialog({ ...dialog, idx: dialog.idx + 1 })
@@ -167,10 +160,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         setTalk({
           lines: AFTER_G2,
           idx: 0,
-          then: () => {
-            setStep('room')
-            setDialog({ texts: [ROOM_GOAL], idx: 0 })
-          },
+          then: () => setStep('room'),
         })
       else setTalk({ lines: AFTER_G1, idx: 0, then: () => setStep('g2') })
     }, CLEAR_MS)
@@ -213,7 +203,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         onClear={onClear}
       />
     )
-  } else if (word.step === 'room') {
+  } else if (word.step === 'room' || (talk?.lines === AFTER_G2 && talk.idx >= ROOM_FROM)) {
     view = (
       <div className="word-room">
         <div className="word-head">
@@ -230,9 +220,19 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
       </div>
     )
   } else {
-    // ルール説明中は1ゲーム目の画面を見せておく（触れない）
+    // ルール説明中は1ゲーム目の画面を見せておく（触れない）。見本のワードを上に出す
+    const demo = word.step === 'rule' && talk?.lines === RULE ? RULE_DEMO[talk.idx] : undefined
     view = (
       <div className="word-room">
+        {demo && (
+          <div className="word-head" key={demo.word}>
+            <div className="word-label">見本</div>
+            <div className="word-prompt">
+              <small>{demo.label}</small>
+              <b>{demo.word}</b>
+            </div>
+          </div>
+        )}
         <div className="word-field">
           <div className="word-stage" style={{ aspectRatio: ASPECT[1] }}>
             <img className="hide-bg" src={st3GameImage(1)} alt="" />
@@ -266,17 +266,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         overlay(
           <>
             <div className="hide-catch" onClick={nextTalk} />
-            <div className={`hide-elf${shopOpen ? ' is-compact' : ''}`} key={`${talk?.lines[0]?.text}${talk?.idx}`}>
-              <img
-                src={line.who === 'elf' ? characterImage('Common', line.emotion ?? '真顔') : characterImage('Stage3', line.emotion ?? '真顔')}
-                alt=""
-              />
-              <p>
-                <span>{line.who === 'elf' ? 'エルフ' : ST3_NAME}</span>
-                {line.text}
-                <i>▼</i>
-              </p>
-            </div>
+            <GameTalk key={`${talk?.lines[0]?.text}${talk?.idx}`} line={line} compact={shopOpen} />
           </>,
         )}
 

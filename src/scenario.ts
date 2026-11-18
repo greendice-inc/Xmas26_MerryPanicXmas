@@ -30,6 +30,8 @@ export interface NovelLine {
   /** この台詞が出たときに鳴らす効果音・音声（URL） */
   se?: string
   voice?: string
+  /** ゲーム画面の会話の位置（bottom=下のボタンのすぐ上 / top=画面の上 / shop=Santazon を開いている間の左下） */
+  pos?: 'bottom' | 'top' | 'shop'
 }
 
 /** ハートを押したときに出す「キモチ」 */
@@ -60,7 +62,7 @@ const rin = (text: string, emotion: Emotion = '楽', speaker = 'リン'): NovelL
 export const ST1_MOOD: Mood = {
   icon: characterImage('Stage1', '楽'),
   name: 'リン',
-  lines: [{ text: '小さいころからわなげは得意だったんだもん。このゲームも絶対に勝てるはず！' }],
+  lines: [{ text: 'わなげはとっても得意！絶対に勝てるはず！' }],
 }
 export const ST1_MOOD_AFTER: Mood = {
   icon: characterImage('Stage1', '喜'),
@@ -78,7 +80,7 @@ const STAGE1_INTRO: NovelScene = {
     elf1('子ども部屋からの通信です。'),
     rin('こんにちは！', '楽', '？？？'),
     rin('私はリンだよー！', '喜', '？？？'),
-    rin('私とやるゲームは{『ポイントリング』}！！', '喜'),
+    rin('私とやるゲームは{『リングデマーク』}！！', '喜'),
     rin('リングを投げて、ポイントをゲットするゲームみたい！'),
     elf1('このゲームは、おおざっぱに言うと{わなげゲーム}です。\nより高いポイントをゲットした方の勝ちです。'),
     elf1('それぞれの部屋には、{ターゲット}が設置されます。\n投げ手の人は、そのターゲットに向かって{リング}を投げます。'),
@@ -132,25 +134,58 @@ export const ST2_MOOD: Mood = {
   ],
 }
 
-const ST2_KIDS_NAME = 'アミー・ジミー・トミー'
+const ST2_KIDS_NAME = '3兄弟'
 
-/** ステージ2の導入。三人兄弟（シルエット）とかくれんぼ */
+/** ステージ2：ダミー（「？」だけを置く） */
+export const DUMMY_IMAGE =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500"><text x="200" y="380" font-size="360" font-weight="900" text-anchor="middle" fill="#3a3a3f" font-family="sans-serif">？</text></svg>',
+  )
+
+const elf2 = (text: string, emotion: Emotion = '真顔'): NovelLine => ({ speaker: 'エルフ', character: 'Common', text, emotion })
+/** 導入では、まだ誰がどれか分からないのでシルエット */
+const sil = (speaker: string, text: string, emotion: Emotion = '楽', more: Partial<NovelLine> = {}): NovelLine => ({
+  speaker,
+  charSrc: st2Silhouette(emotion),
+  text,
+  emotion,
+  ...more,
+})
+/** 見つかったあとは、ひとりずつの画像 */
+const kid2 = (who: keyof typeof ST2_KIDS, text: string): NovelLine => ({ speaker: ST2_KIDS[who].name, charSrc: ST2_KIDS[who].image, text })
+
+/** ステージ2の導入。三兄弟（シルエット）とかくれんぼ『かくれんトリオ』 */
 const STAGE2_INTRO: NovelScene = {
   character: 'Stage2',
   background: 'Stage2',
   lines: [
-    { speaker: ST2_KIDS_NAME, charSrc: st2Silhouette('楽'), text: 'こんにちは！', emotion: '楽' },
-    { speaker: ST2_KIDS_NAME, charSrc: st2Silhouette('楽'), text: '僕たち三人兄弟とかくれんぼで遊ぼうよ！', emotion: '楽' },
-    {
-      speaker: ST2_KIDS_NAME,
-      charSrc: st2Silhouette('真顔'),
-      text: 'あ、そうそうさっき注文で子供のマネキンと洋服を2つ買って、ダミーを作ったんだ。',
-      slide: RECORDS['st2-card'].image,
-    },
-    { speaker: ST2_KIDS_NAME, charSrc: st2Silhouette('喜'), text: 'ダミーと合わせて4人で隠れるから、大人のふたりは僕らを見つけてね。', emotion: '喜' },
-    { speaker: 'エルフ', character: 'Common', text: 'キモチヨメール使って調べます。', emotion: '真顔' },
-    { speaker: '', text: '', mood: ST2_MOOD },
-    { speaker: 'エルフ', character: 'Common', text: 'まずは長男のアミーを見つけよう！', emotion: '楽' },
+    elf2('さて、第2ゲームへと進みましょう。'),
+    elf2('子ども部屋からの通信です。'),
+    sil('アミー', 'やあ！オレはアミーだ'),
+    sil('ジミー', 'ジミーです', '真顔'),
+    sil('トミー', 'ボクはトミーだよ！', '喜'),
+    sil('アミー', 'オレ達きょうだいと遊ぶゲームは……'),
+    sil(ST2_KIDS_NAME, '『かくれんトリオ』！', '喜'),
+    sil('トミー', 'ボクたち三兄弟といっしょにかくれんぼで遊ぼうよ！'),
+    sil('トミー', 'さっきsantazonを使って、こんなものを取り寄せたんだ！', '楽', { slide: RECORDS['st2-card'].image }),
+    sil('トミー', 'このアイテムで生み出した、新たな仲間{「ダミー」}も加えた\nボクたち4人が隠れるから、大人の2人で見つけ出してね！', '喜'),
+    elf2('このゲームでは、子ども部屋がエルフの準備した\n「かくれんぼフィールド」に変化しています。'),
+    elf2('そして、ここに{アミー}、{ジミー}、{トミー}、そして{ダミー}の\n4人がこのかくれんぼフィールドに隠れます。'),
+    elf2('ゲームは3ラウンド。1ラウンドごとに、\n大人は隠れ場所を1か所指定してください。'),
+    elf2('指定した隠れ場所にいるのが{3兄弟}だったら、{大人の勝ち}。\nいるのが{ダミー}だったら、{子どもの勝ち}。'),
+    elf2('だれも隠れていないところを指定したら、\nやる気なしとみなされて{「失格」}になりますのでご注意を。', '怒'),
+    elf2('ここで、3兄弟の気持ちを読み取っておきましょう……\nまずは、長男のアミーから。'),
+    sil('アミー', 'みんながどこに隠れたかも気になるから、\n一番最初に見つけてほしいな。', '真顔'),
+    elf2('つぎに、次男のジミー。'),
+    sil('ジミー', 'お兄ちゃんよりは長く隠れていたいな。', '真顔'),
+    elf2('三男のトミー。'),
+    sil('トミー', '最後にボクとダミーの2人になって、\nダミーに引っかかってくれるといいな！！', '喜'),
+    elf2('そして、ダミー。'),
+    { speaker: 'ダミー', charSrc: DUMMY_IMAGE, text: '……' },
+    elf2('とまあ、冗談はおいておいて。', '楽'),
+    elf2('3つのラウンドで、それぞれ誰を見つけなければいけないのかは、\nこれで分かったと思います。'),
+    sil('トミー', 'じゃあ、ボクたちは隠れるね！\n大人のみんな、がんばってね！', '喜'),
   ],
 }
 
@@ -159,8 +194,13 @@ const STAGE2_CLEAR: NovelScene = {
   character: 'Stage2',
   background: 'Stage2',
   lines: [
-    { speaker: ST2_KIDS_NAME, text: 'やったー！勝った勝ったー！', emotion: '喜' },
-    { speaker: ST2_KIDS_NAME, text: 'すごく楽しかった！遊んでくれてありがとう！', emotion: '楽' },
+    kid2('tommy', 'ボクの勝ちだね！\n3兄弟の中でもボクがサイキョウなんだ！'),
+    kid2('amy', 'そうだね、オレたちの中で一番はトミーだな！'),
+    kid2('jimmy', '楽しかったよ！'),
+    kid2('tommy', 'さよならー！'),
+    { speaker: ST2_KIDS_NAME, text: 'さよ～なら～！', emotion: '喜' },
+    elf2('笑顔で帰ってくれて、よかったですね。', '楽'),
+    elf2('それでは次のゲームに進みましょう。'),
   ],
 }
 
@@ -174,22 +214,44 @@ export const ST3_MOOD: Mood = {
   icon: characterImage('Stage3', '楽'),
   name: ST3_NAME,
   lines: [
-    { who: 'カイ', text: '私たちの考えたゲームを全部解いてほしい！' },
-    { who: 'メイ', text: '私たちの考えたゲームを全部解いてほしい！' },
+    { who: 'カイ', text: '「大人のすごさ」を実感したい。だから、エルフさんに頼んで難しめの問題を用意してもらった。' },
+    { who: 'メイ', text: '全問クリアする、カッコいい大人が見たい！' },
   ],
 }
 
-/** ステージ3の導入。カイ・メイと押さえてワード */
+const elf3 = (text: string, emotion: Emotion = '真顔'): NovelLine => ({ speaker: 'エルフ', character: 'Common', text, emotion })
+const km3 = (speaker: string, text: string, emotion: Emotion = '楽'): NovelLine => ({ speaker, text, emotion })
+
+/** ステージ3の導入。カイ・メイと『おさえてワード』（ルールの続きはゲーム画面で） */
 const STAGE3_INTRO: NovelScene = {
   character: 'Stage3',
   background: 'Stage3',
   lines: [
-    { speaker: ST3_NAME, text: '今回の対戦相手ですね。', emotion: '楽' },
-    { speaker: ST3_NAME, text: '私たちの考えたカイ・メイゲームをやってもらいます。', emotion: '喜' },
-    { speaker: ST3_NAME, text: '全部クリアできますかね？', emotion: '楽' },
-    { speaker: 'エルフ', character: 'Common', text: 'キモチヨメール使用中…', emotion: '真顔' },
-    { speaker: '', text: '', mood: ST3_MOOD },
-    { speaker: 'エルフ', character: 'Common', text: '頑張ってクリアしましょう。', emotion: '楽' },
+    elf3('それでは、第3ゲームです。'),
+    elf3('子ども部屋からの通信です。'),
+    km3(ST3_NAME, 'はじめまして！', '喜'),
+    km3('カイ', 'ボクはカイ、'),
+    km3('メイ', 'ボクはメイです！'),
+    km3(ST3_NAME, '今回のゲームは……{『おさえてワード』}！', '喜'),
+    km3('カイ', '言葉に関わるゲームのようですね。楽しみです！'),
+    elf3('ルール説明をしていきましょう。'),
+    elf3('このゲームは、4文字の言葉ができるように、\n文字を押さえていくゲームです。'),
+    elf3('大人チームと子どもチームで同じ内容をプレイし、\nより早く最後の言葉までクリアした方が勝ちとなります。'),
+    elf3('ゲーム画面を見せながら進めていきましょう。'),
+  ],
+}
+
+/** ステージ3のクリア。部屋でのラウンド3のあと */
+const STAGE3_CLEAR: NovelScene = {
+  character: 'Stage3',
+  background: 'Stage3',
+  lines: [
+    elf3('お見事！\nラウンド3も大人チームが先にクリアしました！', '楽'),
+    km3('メイ', 'さすがですね！\nボクたちも立派な大人になれるようにがんばります！', '喜'),
+    km3('カイ', 'すばらしいです！\nいっしょうけんめい勉強していきます！', '喜'),
+    km3(ST3_NAME, 'ありがとうございました！', '喜'),
+    elf3('2人とも、笑顔で帰ってくれて、よかったですね。', '楽'),
+    elf3('それでは次のゲームに進みましょう。'),
   ],
 }
 
@@ -198,8 +260,6 @@ export const ST4_NAME = 'ロビン'
 /** ステージ4：ジャック機能のアイコン */
 export const JACK_ICON = `${BASE}BG/Common/noz_icon.webp`
 /** ステージ4：ビンゴカードと、穴の画像 */
-export const BINGO_CARD_IMAGE = `${BASE}BG/Stage4/bingo/bingo_card.png`
-export const BINGO_HIT_IMAGE = `${BASE}BG/Stage4/bingo/hit.png`
 
 /** ステージ4：ロビンのキモチ */
 export const ST4_MOOD: Mood = {
@@ -341,7 +401,7 @@ const STAGE1_CLEAR: NovelScene = {
     {
       speaker: 'エルフ',
       character: 'Common',
-      text: 'どうやらリンはもうポイントリングを終えちゃったみたいです。一億ポイントもゲットできるマークはないはずですが・・・',
+      text: 'どうやらリンはもうリングデマークを終えちゃったみたいです。一億ポイントもゲットできるマークはないはずですが・・・',
       emotion: '真顔',
     },
     { speaker: '', text: '', banner: 'リン１ポイント' },
@@ -394,6 +454,7 @@ const STAGE1_CLEAR: NovelScene = {
 export const CLEAR: NovelScene[] = NOVEL.map((n, i): NovelScene => {
   if (i === 0) return STAGE1_CLEAR
   if (i === 1) return STAGE2_CLEAR
+  if (i === 2) return STAGE3_CLEAR
   // LAST のクリア会話は、マスターエルフが出てくる場面（ゲームの途中で入る）
   if (i === 4) return LAST_TWIST
   return {

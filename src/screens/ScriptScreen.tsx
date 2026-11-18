@@ -15,6 +15,8 @@ import {
   saveChar,
   saveScene,
   saveSound,
+  saveImage,
+  imageUrl,
   sceneLines,
   soundUrl,
   toNovelScene,
@@ -23,18 +25,20 @@ import {
   type ScriptChar,
   type ScriptLine,
   type ScriptSound,
+  type ScriptImage,
+  type SceneDef,
 } from '../script/scriptData'
 
 type Tab = 'chars' | (typeof SCRIPT_TABS)[number]
 
 /** 立ち絵を、透明を残したまま Firestore に入る大きさ（長辺 900px の WebP）にする */
-function fileToPortrait(file: File): Promise<string> {
+function fileToPortrait(file: File, start = 900, limit = 600_000): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
       URL.revokeObjectURL(url)
-      let max = 900
+      let max = start
       for (;;) {
         const scale = Math.min(1, max / Math.max(img.width, img.height))
         const canvas = document.createElement('canvas')
@@ -42,7 +46,7 @@ function fileToPortrait(file: File): Promise<string> {
         canvas.height = Math.max(1, Math.round(img.height * scale))
         canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
         const data = canvas.toDataURL('image/webp', 0.86)
-        if (data.length < 600_000) return resolve(data)
+        if (data.length < limit) return resolve(data)
         if (max < 300) return reject(new Error('画像が大きすぎます'))
         max = Math.round(max * 0.75)
       }
@@ -72,6 +76,8 @@ const KIND_LABEL: Record<LineKind, string> = { talk: 'セリフ', banner: '中�
 export default function ScriptScreen({ onBack }: { onBack: () => void }) {
   const script = useScript()
   const [tab, setTab] = useState<Tab>('Stage1')
+  // 場面のタブ（ステージの中の、導入・ゲーム中・クリア後など）
+  const [sceneSel, setSceneSel] = useState<Record<string, string>>({})
   // 編集中の内容（保存すると消える）
   const [chars, setChars] = useState<ScriptChar[] | null>(null)
   const [dirtyChars, setDirtyChars] = useState<Set<string>>(new Set())
@@ -143,7 +149,20 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
 
   const play = (id: string) => {
     const def = SCENES.find((s) => s.id === id)
-    if (def) setPreview(toNovelScene(def, linesOf(id), allChars, script.sounds))
+    if (def) setPreview(toNovelScene(def, linesOf(id), allChars, script.sounds, script.images))
+  }
+
+  /** 中央に出す画像。1件ずつ Firestore に入れる（長辺 1600px まで・1件 900KB まで） */
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const data = await fileToPortrait(file, 1600, 900_000)
+      const s: ScriptImage = { id: newId(), name: file.name, data }
+      await saveImage(s)
+      return `image:${s.id}`
+    } catch (e) {
+      setStatus({ text: e instanceof Error ? e.message : '画像を追加できませんでした', error: true })
+      return null
+    }
   }
 
   const uploadSound = async (file: File): Promise<string | null> => {
@@ -205,9 +224,22 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
         </div>
       ) : (
         <div className="script-body">
-          {SCENES.filter((s) => s.tab === tab).map((s) => (
+          <nav className="script-subtabs">
+            {SCENES.filter((s) => s.tab === tab).map((s, i) => {
+              const on = (sceneSel[tab] ?? SCENES.find((x) => x.tab === tab)?.id) === s.id
+              return (
+                <button key={s.id} className={on ? 'on' : ''} onClick={() => setSceneSel((m) => ({ ...m, [tab]: s.id }))}>
+                  <small>{s.game ? 'ゲーム画面' : '会話'}</small>
+                  {s.label}
+                  {scenes[s.id] ? <i>●</i> : script.savedScenes[s.id] ? <em>保存済み</em> : null}
+                </button>
+              )
+            })}
+          </nav>
+          {SCENES.filter((s) => s.tab === tab && (sceneSel[tab] ?? SCENES.find((x) => x.tab === tab)?.id) === s.id).map((s) => (
             <SceneEditor
               key={s.id}
+              def={s}
               title={`${s.tab}　${s.label}`}
               lines={linesOf(s.id)}
               saved={!!script.savedScenes[s.id]}
@@ -227,11 +259,10 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
                 setStatus({ text: '元のセリフに戻しました' })
               }}
               onUpload={uploadSound}
+              images={script.images}
+              onUploadImage={uploadImage}
             />
           ))}
-          {tab === 'Stage4' || tab === 'StageF' ? (
-            <p className="script-note">Stage4・StageF はまだ仮のセリフです。ここで決めておくと、作ったときにそのまま使えます。</p>
-          ) : null}
         </div>
       )}
 
@@ -322,6 +353,7 @@ function CharCard({
 }
 
 function SceneEditor({
+  def,
   title,
   lines,
   saved,
@@ -332,7 +364,10 @@ function SceneEditor({
   onPlay,
   onReset,
   onUpload,
+  images,
+  onUploadImage,
 }: {
+  def: SceneDef
   title: string
   lines: ScriptLine[]
   saved: boolean
@@ -343,6 +378,8 @@ function SceneEditor({
   onPlay: () => void
   onReset: () => void
   onUpload: (file: File) => Promise<string | null>
+  images: ScriptImage[]
+  onUploadImage: (file: File) => Promise<string | null>
 }) {
   const edit = (i: number, patch: Partial<ScriptLine>) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const move = (i: number, d: number) => {
@@ -375,10 +412,18 @@ function SceneEditor({
           {saved && <button onClick={onReset}>元のセリフに戻す</button>}
         </div>
       </div>
+      {def.game && (
+        <p className="script-hint script-scene-note">
+          ゲーム画面の上に出る会話です。{def.noPos ? 'マーク当ての下の枠に出ます。' : '「位置」で、下（ボタンのすぐ上）か上かを選べます。'}
+          {def.fixed && ' 行ごとに演出（ボタンを光らせる・カードを配るなど）が決まっているので、行の数と順番は変えられません。'}
+          「▶ この場面を再生」は会話の画面で流します（位置はゲームで確かめてください）。
+        </p>
+      )}
       <ol className="script-lines">
         {lines.map((l, i) => (
           <LineRow
             key={l.id}
+            def={def}
             n={i + 1}
             line={l}
             chars={chars}
@@ -391,15 +436,18 @@ function SceneEditor({
             onCopy={() => insert(i + 1, l)}
             onRemove={() => remove(i)}
             onUpload={onUpload}
+            images={images}
+            onUploadImage={onUploadImage}
           />
         ))}
       </ol>
-      <button className="script-add-line" onClick={() => insert(lines.length)}>＋ セリフを追加</button>
+      {!def.fixed && <button className="script-add-line" onClick={() => insert(lines.length)}>＋ セリフを追加</button>}
     </section>
   )
 }
 
 function LineRow({
+  def,
   n,
   line,
   chars,
@@ -412,7 +460,10 @@ function LineRow({
   onCopy,
   onRemove,
   onUpload,
+  images,
+  onUploadImage,
 }: {
+  def: SceneDef
   n: number
   line: ScriptLine
   chars: ScriptChar[]
@@ -425,6 +476,8 @@ function LineRow({
   onCopy: () => void
   onRemove: () => void
   onUpload: (file: File) => Promise<string | null>
+  images: ScriptImage[]
+  onUploadImage: (file: File) => Promise<string | null>
 }) {
   const c = chars.find((x) => x.id === line.char)
   const portrait = line.kind === 'talk' ? charImage(c, line.emotion) : undefined
@@ -437,7 +490,8 @@ function LineRow({
           <select
             value={line.kind}
             onChange={(e) => onEdit({ kind: e.target.value as LineKind })}
-            disabled={line.kind === 'mood'}
+            // ゲーム画面の会話は、セリフだけ
+            disabled={line.kind === 'mood' || !!def.game}
           >
             <option value="talk">セリフ</option>
             <option value="banner">中央の文字</option>
@@ -467,7 +521,24 @@ function LineRow({
                   </button>
                 ))}
               </div>
+              <input
+                className="script-name"
+                value={line.name ?? ''}
+                placeholder={`表示名（空なら${c?.name ?? 'キャラ名'}）`}
+                onChange={(e) => onEdit({ name: e.target.value || undefined })}
+                title="？？？ や（心の声）など、キャラ名と違う名前で出すとき"
+              />
             </>
+          )}
+          {def.game && !def.noPos && line.kind === 'talk' && (
+            <label className="script-pos">
+              位置
+              <select value={line.pos ?? 'bottom'} onChange={(e) => onEdit({ pos: e.target.value === 'bottom' ? undefined : (e.target.value as ScriptLine['pos']) })}>
+                <option value="bottom">下（ボタンのすぐ上）</option>
+                <option value="top">上</option>
+                <option value="shop">左下（Santazonを開いている間）</option>
+              </select>
+            </label>
           )}
         </div>
         {line.kind === 'mood' ? (
@@ -492,16 +563,18 @@ function LineRow({
         <div className="script-line-row">
           <SoundField label="SE" value={line.se} sounds={sounds} onChange={(v) => onEdit({ se: v })} onUpload={onUpload} />
           <SoundField label="音声" value={line.voice} sounds={sounds} onChange={(v) => onEdit({ voice: v })} onUpload={onUpload} />
-          {line.slide && <span className="script-hint">中央に画像あり</span>}
+          <ImageField value={line.slide} images={images} onChange={(v) => onEdit({ slide: v })} onUpload={onUploadImage} />
         </div>
       </div>
-      <div className="script-line-actions">
-        <button onClick={() => onMove(-1)} disabled={first} aria-label="上へ">↑</button>
-        <button onClick={() => onMove(1)} disabled={last} aria-label="下へ">↓</button>
-        <button onClick={onInsert} title="下にセリフを追加">＋</button>
-        <button onClick={onCopy} title="複製">複製</button>
-        <button className="script-danger" onClick={onRemove}>削除</button>
-      </div>
+      {!def.fixed && (
+        <div className="script-line-actions">
+          <button onClick={() => onMove(-1)} disabled={first} aria-label="上へ">↑</button>
+          <button onClick={() => onMove(1)} disabled={last} aria-label="下へ">↓</button>
+          <button onClick={onInsert} title="下にセリフを追加">＋</button>
+          <button onClick={onCopy} title="複製">複製</button>
+          <button className="script-danger" onClick={onRemove}>削除</button>
+        </div>
+      )}
     </li>
   )
 }
@@ -538,6 +611,55 @@ function SoundField({
         ref={fileRef}
         type="file"
         accept="audio/*"
+        hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (!f) return
+          const ref = await onUpload(f)
+          if (ref) onChange(ref)
+        }}
+      />
+    </div>
+  )
+}
+
+/** セリフと一緒に画面の中央へ出す画像。アップロードした画像から選ぶか、新しく追加する */
+function ImageField({
+  value,
+  images,
+  onChange,
+  onUpload,
+}: {
+  value?: string
+  images: ScriptImage[]
+  onChange: (v: string | undefined) => void
+  onUpload: (file: File) => Promise<string | null>
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const url = imageUrl(value, images)
+  const known = !value || images.some((s) => `image:${s.id}` === value)
+  return (
+    <div className="script-sound script-image">
+      <span>画像</span>
+      <select value={value ?? ''} onChange={(e) => (e.target.value === '+' ? fileRef.current?.click() : onChange(e.target.value || undefined))}>
+        <option value="">なし</option>
+        {images.map((s) => (
+          <option key={s.id} value={`image:${s.id}`}>{s.name}</option>
+        ))}
+        {/* コードで決めている画像（public のパス） */}
+        {!known && <option value={value}>{value?.split('/').pop()}</option>}
+        <option value="+">＋ 画像を追加…</option>
+      </select>
+      {url && (
+        <a className="script-image-thumb" href={url} target="_blank" rel="noreferrer" title="大きく見る">
+          <img src={url} alt="" />
+        </a>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
         hidden
         onChange={async (e) => {
           const f = e.target.files?.[0]
