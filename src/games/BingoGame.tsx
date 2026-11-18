@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import GameTalk from '../components/GameTalk'
-import MoodCard from '../components/MoodCard'
+import { Spotlight } from './Stage1Guide'
 import { useGameLines } from '../script/scriptData'
+import { sockKeyOfItems } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import {
   JACK_ICON,
-  ST4_MOOD,
   ST4_NAME,
   type Emotion,
   type NovelLine,
@@ -22,6 +22,7 @@ import {
   holeChar,
   isBingoCart,
   itemLabel,
+  itemParts,
   openedCells,
   roundOf,
   ROUNDS,
@@ -41,6 +42,8 @@ const AFTER_FLIP_MS = 1500
 const AFTER_BINGO_MS = 2200
 /** 「ROUND 1」を見せる長さ */
 const BANNER_MS = 2200
+/** 右上のジャックのボタン（styles.css の button.bingo-jack と合わせる：右35px・上35px・130×130） */
+const JACK_SPOT = { x: 1755, y: 35, w: 130, h: 130 }
 const BG: CSSProperties = { backgroundImage: `url("${BINGO_BG_IMAGE}")` }
 
 type Side = 'kid' | 'adult'
@@ -59,24 +62,36 @@ interface Tut {
 }
 const TUT0: Tut = { dealt: false, decks: false, reveal: false, flips: 0, jack: false }
 
-type Beat = { kind: 'say'; line: Line; set?: Partial<Tut> } | { kind: 'flip'; who: Side } | { kind: 'mood' }
-const say = (line: Line, set?: Partial<Tut>): Beat => ({ kind: 'say', line, set })
+type Beat = { kind: 'say'; line: Line; set?: Partial<Tut>; after?: Partial<Tut> } | { kind: 'flip' }
+const say = (line: Line, set?: Partial<Tut>, after?: Partial<Tut>): Beat => ({ kind: 'say', line, set, after })
 
-/** チュートリアルの説明（st4-tutorial）の、行ごとの演出 */
-const TUTORIAL_FX: Record<number, Partial<Tut>> = { 0: { dealt: true }, 7: { decks: true }, 9: { reveal: true } }
+/** チュートリアルの説明（st4-tutorial）の、行ごとの演出。？の公開は reveal の行 */
+const TUTORIAL_FX: Record<string, Partial<Tut>> = { sheet: { dealt: true }, decks: { decks: true } }
+/** その行をタップして次へ進むときに起きる演出（？の公開：左上からじわーっと変わる） */
+const TUTORIAL_AFTER: Record<string, Partial<Tut>> = { reveal: { reveal: true } }
+/** ？が公開されるアニメーション（CSS の bingo-reveal）が終わるまで */
+const REVEAL_MS = 1600
+/** ロビンの画面が開くのを見せてから、次のセリフ */
+const JACK_OPEN_MS = 500
+/** この名前の行の前に、カードを1枚めくる（1・3・5枚目はロビン、2・4・6枚目は大人。順番は flow が決める） */
+const FLIP_LINES = ['flip1', 'flip2', 'flip3', 'flip4', 'flip5', 'flip6']
+/** めくり始めるまで */
+const TUT_FLIP_PRE_MS = 500
+/** 山札の中身の文字の大きさ（いつも固定。いちばん長い並び「ブリキのロボット1体・シュークリーム5個・たいこ3個」が吹き出しに収まる大きさ） */
+const DECK_LIST_PX = 48
+/** 山札にカードが配られるアニメーション（CSS の bingo-deck-in：.45s、1枚ごとに .09s ずつ遅れる）が終わるまで */
+const DECK_DEAL_MS = 1100
+/** ビンゴシートを配るアニメーション（CSS の bingo-deal：.7s、右のシートは .25s 遅れる）が終わるまで */
+const DEAL_MS = 1050
+/** めくったカードが置かれるまで（CSS の flip-x などの 1.2s に少し余裕を足す） */
+const FLIP_MS = 1250
 
-/** チュートリアルの流れ：説明 → 交互に5枚めくる → ビンゴのあと → キモチ → ジャック機能（最後の行でアイコンが出る） */
+/** チュートリアルの流れ：説明（flip1〜6 の行の前にカードをめくる。最後にロビンのキモチを話す）→ キモチのあと → ジャック機能（jack の行でアイコンが出る） */
 function tutorialBeats(intro: Line[], after: Line[], jack: Line[]): Beat[] {
   return [
-    ...intro.map((l, i) => say(l, TUTORIAL_FX[i])),
-    { kind: 'flip', who: 'kid' },
-    { kind: 'flip', who: 'adult' },
-    { kind: 'flip', who: 'kid' },
-    { kind: 'flip', who: 'adult' },
-    { kind: 'flip', who: 'kid' },
+    ...intro.flatMap((l): Beat[] => [...(FLIP_LINES.includes(l.id ?? '') ? [{ kind: 'flip' } as Beat] : []), say(l, TUTORIAL_FX[l.id ?? ''], TUTORIAL_AFTER[l.id ?? ''])]),
     ...after.map((l) => say(l)),
-    { kind: 'mood' },
-    ...jack.map((l, i) => say(l, i === jack.length - 1 ? { jack: true } : undefined)),
+    ...jack.map((l) => say(l, l.id === 'jack' ? { jack: true } : undefined)),
   ]
 }
 
@@ -93,11 +108,14 @@ interface Flow {
   adultFlipped: BingoItem[]
   /** 先にそろった方（まだなら null。全部めくってそろわなければ 'none'） */
   winner: Side | 'none' | null
+  /** 勝負がついたのは、何枚目をめくったとき（まだなら Infinity） */
+  winAt: number
   kidLine: number[]
   adultLine: number[]
 }
 
-function flow(round: BingoRound, kidOrder: number[], adultOrder: number[], flips: number): Flow {
+/** through=true は、ビンゴがそろっても、めくった分は最後まで数える（チュートリアルの「ちなみに」の1枚） */
+function flow(round: BingoRound, kidOrder: number[], adultOrder: number[], flips: number, through = false): Flow {
   const seq: Flow['seq'] = []
   for (let i = 0; i < flips; i++) {
     const who: Side = i % 2 === 0 ? 'kid' : 'adult'
@@ -106,25 +124,33 @@ function flow(round: BingoRound, kidOrder: number[], adultOrder: number[], flips
     if (item) seq.push({ who, item })
   }
   let winner: Flow['winner'] = null
+  let winAt = Infinity
   let kidLine: number[] = []
   let adultLine: number[] = []
   const chars: string[] = []
-  for (const s of seq) {
+  for (const [n, s] of seq.entries()) {
     chars.push(holeChar(s.item))
+    // 勝負がついたあとにめくった分（チュートリアルの「ちなみに」）は、穴だけ開けて、ビンゴの印は出さない
+    if (winner) continue
     kidLine = bingoCells(openedCells(round.kid, chars))
     adultLine = bingoCells(openedCells(round.adult, chars))
-    if (kidLine.length || adultLine.length) {
+    if (!winner && (kidLine.length || adultLine.length)) {
       winner = kidLine.length ? 'kid' : 'adult'
-      break
+      winAt = n + 1
+      if (!through) break
     }
   }
-  if (!winner && seq.length >= round.kidDeck.length + round.adultDeck.length) winner = 'none'
+  if (!winner && seq.length >= round.kidDeck.length + round.adultDeck.length) {
+    winner = 'none'
+    winAt = seq.length
+  }
   return {
     round,
     seq,
     kidFlipped: seq.filter((s) => s.who === 'kid').map((s) => s.item),
     adultFlipped: seq.filter((s) => s.who === 'adult').map((s) => s.item),
     winner,
+    winAt,
     kidLine,
     adultLine,
   }
@@ -134,12 +160,20 @@ interface Props {
   doc: TeamDoc
   update: (patch: Partial<TeamDoc>) => void
   shopOpen: boolean
+  /** 暗くして Santazon を閉じ、then を実行する（取り出し依頼のあと、ゲーム画面へ） */
+  onFadeToGame: (then: () => void) => void
   /** ROUND2 が終わった。次のステージ（LAST）へ */
   onDone: () => void
+  /** ROUND1 の説明で、Santazon の「エルフに取り出し依頼」ボタンを光らせる */
+  onRequestGlow?: (on: boolean) => void
+  /** エルフ・ロビンが話している間（チュートリアルの間も）は、下のボタンを押せなくする */
+  onLock?: (locked: boolean) => void
+  /** 注文が届いて、「アイテムが届きました」を閉じた */
+  arrived?: boolean
 }
 
 /** ステージ4：カタカナビンゴ。チュートリアル → ROUND1 → ROUND2 */
-export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
+export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone, onRequestGlow, onLock, arrived }: Props) {
   const { products } = useProducts()
   const bingo: BingoProgress = { ...DEFAULT_BINGO, ...doc.bingo }
   const bingoRef = useRef(bingo)
@@ -158,13 +192,14 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   const tutIntro = useGameLines('st4-tutorial')
   const tutAfter = useGameLines('st4-tutorial-bingo')
   const tutJack = useGameLines('st4-jack')
-  const sockLine = useGameLines('st4-sock')[0]
+  const orderLines = useGameLines('st4-r1-order')
+  const sockLines = useGameLines('st4-sock')
+  const ROUND_START = { r1: useGameLines('st4-r1-start'), r2: useGameLines('st4-r2-start') }
   const ROUND_END = { r1: useGameLines('st4-r1-end'), r2: useGameLines('st4-r2-end') }
   // チュートリアルは、始まったときの台詞で最後まで進める（途中で台本が変わらないように）
   const beatsRef = useRef<Beat[]>([])
   const TUTORIAL_BEATS = beatsRef.current
   const [talk, setTalk] = useState<{ lines: Line[]; idx: number; then?: () => void } | null>(null)
-  const [mood, setMood] = useState<{ then?: () => void } | null>(null)
   const [jackOpen, setJackOpen] = useState(false)
 
   // ---------- チュートリアル ----------
@@ -179,7 +214,6 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   }, [tutorial])
 
   const nextBeat = () => setBeat((b) => b + 1)
-  const cur = tutorial && beat >= 0 ? TUTORIAL_BEATS[beat] : undefined
   useEffect(() => {
     if (!tutorial || beat < 0) return
     const b = TUTORIAL_BEATS[beat]
@@ -190,12 +224,36 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
     }
     if (b.kind === 'say') {
       if (b.set) setTut((t) => ({ ...t, ...b.set }))
-      setTalk({ lines: [b.line], idx: 0, then: nextBeat })
-    } else if (b.kind === 'mood') {
-      setMood({ then: nextBeat })
-    } else if (b.who === 'kid') {
-      const t1 = setTimeout(() => setTut((t) => ({ ...t, flips: t.flips + 1 })), KID_FLIP_MS)
-      const t2 = setTimeout(nextBeat, KID_FLIP_MS + AFTER_FLIP_MS)
+      // 説明で開いていたロビンの画面は、ここで閉じる
+      if (b.line.id === 'jack-close') setJackOpen(false)
+      const show = () =>
+        setTalk({
+          lines: [b.line],
+          idx: 0,
+          then: () => {
+            // ジャックの説明：タップで進めると、ロビンの画面が開いて、次のセリフ
+            if (b.line.id === 'jack') {
+              setJackOpen(true)
+              setTimeout(nextBeat, JACK_OPEN_MS)
+              return
+            }
+            if (!b.after) return nextBeat()
+            // ？が公開されるアニメーションが終わってから、次のセリフ
+            setTut((t) => ({ ...t, ...b.after }))
+            setTimeout(nextBeat, REVEAL_MS)
+          },
+        })
+      // ビンゴシートや山札が配られるアニメーションが終わってから、次のセリフ
+      const wait = b.set?.dealt ? DEAL_MS : b.set?.decks ? DECK_DEAL_MS : 0
+      if (!wait) show()
+      else {
+        const t = setTimeout(show, wait)
+        return () => clearTimeout(t)
+      }
+    } else {
+      // カードを1枚めくって、穴が開くのを見せてから、次のセリフ
+      const t1 = setTimeout(() => setTut((t) => ({ ...t, flips: t.flips + 1 })), TUT_FLIP_PRE_MS)
+      const t2 = setTimeout(nextBeat, TUT_FLIP_PRE_MS + FLIP_MS + AFTER_FLIP_MS)
       return () => {
         clearTimeout(t1)
         clearTimeout(t2)
@@ -203,19 +261,11 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorial, beat])
-  const tutWaitFlip = cur?.kind === 'flip' && cur.who === 'adult'
-  const [tutFlipped, setTutFlipped] = useState(-1)
-  const tutFlip = () => {
-    if (!tutWaitFlip || tutFlipped === beat) return
-    setTutFlipped(beat)
-    setTut((t) => ({ ...t, flips: t.flips + 1 }))
-    setTimeout(nextBeat, AFTER_FLIP_MS)
-  }
 
   // ---------- ラウンド ----------
   const round = r ? ROUNDS[r] : TUTORIAL
   const f = tutorial
-    ? flow(TUTORIAL, [0, 1, 2], [0, 1, 2], tut.flips)
+    ? flow(TUTORIAL, [0, 1, 2], [0, 1, 2], tut.flips, true)
     : flow(round, bingo.kidOrder, bingo.adultOrder, bingo.started ? bingo.flips : 0)
 
   // ROUND の始まりを大きく見せる
@@ -230,6 +280,58 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
 
   // 正しい注文の問題を解いたら、宅配ソックスの番号を言って山札に入れる
   const solved = !!r && !bingo.deckIn && doc.order?.status === 'solved' && isBingoCart(bingo.step, doc.order.items, products)
+
+  // ROUND1：注文が届いて「アイテムが届きました」を閉じたあと、エルフが「取り出し依頼」の説明をする（Santazon の上で話す）。request の行でボタンが光る
+  const [orderIdx, setOrderIdx] = useState(0)
+  const orderTalk =
+    r === 'r1' && !bingo.deckIn && !!doc.order && bingo.orderTold !== doc.order.at && doc.order.status === 'delivered' && !!arrived && isBingoCart(bingo.step, doc.order.items, products)
+  const orderLine = orderTalk && !talk ? orderLines[orderIdx] : undefined
+  const nextOrder = () => {
+    if (orderIdx + 1 < orderLines.length) setOrderIdx(orderIdx + 1)
+    else {
+      setOrderIdx(0)
+      setBingo({ orderTold: doc.order?.at })
+    }
+  }
+  useEffect(() => {
+    // 説明が全部消された場面は、すぐ次へ
+    if (orderTalk && !talk && orderLines.length === 0) setBingo({ orderTold: doc.order?.at })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  })
+  // 話している間は、下のボタンを押せない（チュートリアルは、セリフの合間もずっと）
+  const busy = tutorial || !!talk || !!orderLine || solved
+  useEffect(() => {
+    onLock?.(busy)
+    return () => onLock?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy])
+  const requestGlow = !!orderLine && orderLine.id === 'request'
+  useEffect(() => {
+    onRequestGlow?.(requestGlow)
+    return () => onRequestGlow?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestGlow])
+
+  // 取り出し依頼のあと：1行目（Santazon の上）→ フェードでゲーム画面へ → 2行目（山札に加えます）→ 山札に配る
+  const [sockIdx, setSockIdx] = useState(0)
+  useEffect(() => {
+    if (!solved) setSockIdx(0)
+  }, [solved])
+  const sockLine = sockLines[sockIdx]
+  const nextSock = () => {
+    if (sockIdx + 1 < sockLines.length) {
+      // 次の行はゲーム画面で話す。暗くして Santazon を閉じてから
+      if (shopOpen) onFadeToGame(() => setSockIdx(sockIdx + 1))
+      else setSockIdx(sockIdx + 1)
+    } else setBingo({ deckIn: true })
+  }
+  // 山札にカードが配られるアニメーションが終わってから、「ゲーム開始」を出す
+  const [deckReady, setDeckReady] = useState(false)
+  useEffect(() => {
+    if (!bingo.deckIn || bingo.started) return setDeckReady(false)
+    const t = setTimeout(() => setDeckReady(true), DECK_DEAL_MS)
+    return () => clearTimeout(t)
+  }, [bingo.deckIn, bingo.started])
 
   // ロビンの番は自動でめくる
   const turn: Side = bingo.flips % 2 === 0 ? 'kid' : 'adult'
@@ -262,7 +364,7 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
           lines: ROUND_END[r],
           idx: 0,
           then: () => {
-            if (r === 'r1') update({ bingo: { ...DEFAULT_BINGO, step: 'r2', jack: true }, order: null })
+            if (r === 'r1') update({ bingo: { ...DEFAULT_BINGO, step: 'r2', jack: true }, order: null, records: [...new Set([...(doc.records ?? []), 'st4-r1'])] })
             else onDone()
           },
         })
@@ -273,7 +375,7 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
           then: () => setBingo({ started: false, flips: 0 }),
         })
       }
-    }, AFTER_BINGO_MS)
+    }, FLIP_MS + AFTER_BINGO_MS)
     return () => {
       clearTimeout(t)
       ended.current = false
@@ -307,20 +409,28 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
     kidDeck: decks,
     adultDeck: adultIn,
     reveal,
+    cardOpen: reveal || (!tutorial && bingo.started),
     kidList: tutorial ? TUTORIAL_KID_LIST : round.kidDeck,
   }
 
   let center: ReactNode = null
   if (tutorial) {
-    if (tutWaitFlip) center = <button className="bingo-flip-btn" onClick={tutFlip}>カードをめくる</button>
-    else if (cur?.kind === 'flip') center = <div className="bingo-turn">ロビンの番</div>
+    // チュートリアルは、めくる操作もしない
   } else if (r) {
     if (!bingo.deckIn) center = <div className="bingo-hint">Santazonでアイテムを3つ注文して、山札をそろえよう</div>
+    else if (!bingo.started && !deckReady) center = null
     else if (!bingo.started)
       center = (
         <button
           className="bingo-flip-btn is-start"
-          onClick={() => setBingo({ started: true, flips: 0, kidOrder: shuffled(round.kidDeck.length), adultOrder: shuffled(round.adultDeck.length) })}
+          onClick={() =>
+            // 「めくっていきましょう」の会話のあと、ゲーム開始
+            setTalk({
+              lines: ROUND_START[r],
+              idx: 0,
+              then: () => setBingo({ started: true, flips: 0, kidOrder: shuffled(round.kidDeck.length), adultOrder: shuffled(round.adultDeck.length) }),
+            })
+          }
         >
           ゲーム開始
         </button>
@@ -335,62 +445,57 @@ export default function BingoGame({ doc, update, shopOpen, onDone }: Props) {
   }
 
   const line = talk?.lines[talk.idx]
-  const label = tutorial ? 'チュートリアル' : r === 'r1' ? 'ROUND 1' : r === 'r2' ? 'ROUND 2' : ''
 
   return (
     <div className="bingo-game" ref={rootRef} style={BG}>
-      <div className="bingo-head">
-        {label && <div className="bingo-label">{label}</div>}
-      </div>
       {/* めくったものは、上下の吹き出し（山札の中身）で印がつく */}
       <Board view={view} perspective="adult" center={center} />
 
       {jack && (
-        <button className="bingo-jack" aria-label="ジャック機能（ロビンの画面を見る）" onClick={() => setJackOpen(true)}>
+        <button className="bingo-jack" disabled={busy} aria-label="ジャック機能（ロビンの画面を見る）" onClick={() => setJackOpen(true)}>
           <img src={JACK_ICON} alt="" />
         </button>
       )}
 
-      {banner && <div className="bingo-banner" key={banner}>{banner}</div>}
-
-      {mood && (
-        <MoodCard
-          mood={ST4_MOOD}
-          onClose={() => {
-            setMood(null)
-            mood.then?.()
-          }}
-        />
+      {/* ROUND1：アイテムを選ぶあいだ、「記録」ボタンの上にルールシートの案内を出す */}
+      {r === 'r1' && !bingo.started && (
+        <div className="bingo-rule-note">{'ゲームの細かいルールは\n机のラックにある\n「アイテムビンゴ・ルールシート」で\n確認できます'}</div>
       )}
+
+      {banner && <div className="bingo-banner" key={banner}>{banner}</div>}
 
       {jackOpen &&
         overlay(
-          <div className="modal-back bingo-jack-back" onClick={() => setJackOpen(false)}>
+          <div className={`modal-back bingo-jack-back${tutorial ? ' is-raised' : ''}`} style={tutorial ? { zIndex: 60 } : undefined} onClick={() => setJackOpen(false)}>
             <div className="modal bingo-jack-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="sz-close" onClick={() => setJackOpen(false)} aria-label="閉じる">✕</button>
               <h2>
                 <img src={JACK_ICON} alt="" />
-                ロビンの画面（見るだけ）
+                ロビンの画面
               </h2>
               <div className="bingo-jack-view" style={BG}>
                 <Board view={view} perspective="kid" />
               </div>
-              <button onClick={() => setJackOpen(false)}>閉じる</button>
             </div>
           </div>,
         )}
 
-      {(line || (solved && !talk)) &&
+      {/* ジャックの説明の行（jack）では、ボタンだけ明るく見せる */}
+      {line?.id === 'jack' && overlay(<Spotlight rect={JACK_SPOT} pass={false} round />)}
+
+      {(line || orderLine || (solved && !talk)) &&
         overlay(
           <>
             <div
               className="hide-catch"
-              onClick={line ? nextTalk : () => setBingo({ deckIn: true })}
+              onClick={line ? nextTalk : orderLine ? nextOrder : nextSock}
             />
             <GameTalk
-              key={line ? `${talk?.lines[0]?.text}${talk?.idx}` : 'sock'}
               // [番号] は、そのラウンドの宅配ソックスの番号
-              line={line ?? { ...(sockLine ?? elf('')), text: (sockLine?.text ?? '').replace(/\[番号\]/g, round.problem?.code ?? '') }}
+              line={line ?? orderLine ?? { ...(sockLine ?? elf('')), text: (sockLine?.text ?? '').replace(/\[番号\]/g, doc.order ? sockKeyOfItems(doc.order.items, products) : '') }}
               compact={shopOpen}
+              // ロビンの画面（ダイアログ）を開いているあいだは、ダイアログにかぶらないよう、画面の一番下で話す
+              low={jackOpen}
             />
           </>,
         )}
@@ -408,6 +513,8 @@ interface BoardView {
   adultDeck: boolean
   /** 相手の？を明かす（チュートリアル） */
   reveal: boolean
+  /** 相手のカードの？だけ外す（ゲーム開始から） */
+  cardOpen: boolean
   /** ロビンの山札の中身（表示の順） */
   kidList: BingoItem[]
 }
@@ -419,7 +526,16 @@ interface BoardView {
  */
 function Board({ view, perspective, center }: { view: BoardView; perspective: Side; center?: ReactNode }) {
   const { flow: f } = view
-  const chars = f.seq.map((s) => holeChar(s.item))
+  // めくるアニメーション（FLIP_MS）が終わってから、カードに〇を付ける・ビンゴの表示を出す。増えたときだけ待つ（戻すときはすぐ）
+  const [shown, setShown] = useState(f.seq.length)
+  useEffect(() => {
+    if (f.seq.length <= shown) return setShown(f.seq.length)
+    const t = setTimeout(() => setShown(f.seq.length), FLIP_MS)
+    return () => clearTimeout(t)
+  }, [f.seq.length, shown])
+  // ビンゴの印は、勝負がついたカードのアニメーションが終わったら出す。そのあとにめくったカード（チュートリアルの「ちなみに」）では、出し直さない
+  const winShown = shown >= f.winAt
+  const chars = f.seq.slice(0, shown).map((s) => holeChar(s.item))
   const sides: Side[] = ['adult', 'kid']
   const last = f.seq[f.seq.length - 1]
   return (
@@ -434,12 +550,13 @@ function Board({ view, perspective, center }: { view: BoardView; perspective: Si
           <Card
             key={`card-${side}`}
             side={side}
-            image={hidden ? HIDDEN_SHEET[side] : f.round.sheets[side]}
+            image={hidden && !view.cardOpen ? HIDDEN_SHEET[side] : f.round.sheets[side]}
+            hiddenImage={side !== perspective ? HIDDEN_SHEET[side] : undefined}
             letters={letters}
             dealt={view.dealt}
             open={openedCells(letters, chars)}
-            line={side === 'kid' ? f.kidLine : f.adultLine}
-            win={f.winner === side}
+            line={winShown ? (side === 'kid' ? f.kidLine : f.adultLine) : []}
+            win={winShown && f.winner === side}
           />,
           <Deck key={`deck-${side}`} side={side} inDeck={deckIn} left={total - flipped.length} />,
           <DeckList
@@ -455,13 +572,44 @@ function Board({ view, perspective, center }: { view: BoardView; perspective: Si
       {/* 真ん中：めくったカード */}
       <div className="bingo-open-slot">
         <img className="bingo-face-bg" src={DECK_FACE_IMAGE} alt="" draggable={false} />
-        {last && (
-          <div className={`bingo-face is-${last.who}`} key={f.seq.length}>
-            <small>{last.who === 'kid' ? ST4_NAME : perspective === 'adult' ? 'あなた' : '大人'}</small>
-            <b className={Array.from(last.item.name).length > 5 ? 'is-long' : ''}>{last.item.name}</b>
-            <em>×{last.item.n}</em>
-          </div>
-        )}
+        {/* めくったカードは、その場に重ねて残す。最新の1枚だけ、山札からくるっと裏返りながら置かれる */}
+        {f.seq.map((s, i) => {
+          const isLast = i === f.seq.length - 1
+          const front = (
+            <div className="bingo-flip-front">
+              <img className="bingo-face-bg" src={DECK_FACE_IMAGE} alt="" draggable={false} />
+              <div className={`bingo-face is-${s.who}`}>
+                <b className={Array.from(itemParts(s.item)[0]).length > 5 ? 'is-long' : ''}>{itemParts(s.item)[0]}</b>
+                <em>{itemParts(s.item)[1]}</em>
+              </div>
+            </div>
+          )
+          // 重ねたときに少しずつずれる（毎回同じずれ方）
+          const rest = {
+            '--rx': `${((i * 7) % 5) * 3 - 6}px`,
+            '--ry': `${((i * 5) % 4) * 2 - 3}px`,
+            '--rr': `${((i * 37) % 9) - 4}deg`,
+            '--dx': s.who === 'kid' ? '240px' : '-240px',
+          } as CSSProperties
+          return (
+            <div className="bingo-pile" key={i} style={rest}>
+              {isLast ? (
+                <div className="flip-x">
+                  <div className="flip-y">
+                    <div className="flip-rot">
+                      <div className="bingo-flip-back">
+                        <img src={DECK_BACK_IMAGE} alt="" draggable={false} />
+                      </div>
+                      {front}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                front
+              )}
+            </div>
+          )
+        })}
       </div>
       {center && <div className="bingo-action">{center}</div>}
     </div>
@@ -484,6 +632,7 @@ const cellStyle = (i: number): CSSProperties => ({ left: (i % 3) * CELL, top: Ma
 function Card({
   side,
   image,
+  hiddenImage,
   letters,
   dealt,
   open,
@@ -492,17 +641,31 @@ function Card({
 }: {
   side: Side
   image: string
+  /** 相手のカードの？の絵。これから本物に変わるとき、左上からじわーっと切り替える */
+  hiddenImage?: string
   letters: BingoCard
   dealt: boolean
   open: Set<number>
   line: number[]
   win: boolean
 }) {
+  // ？のカードから本物に変わった間だけ、？の絵を下に残して、本物を左上から出していく
+  const prevImage = useRef(image)
+  const [wipeFrom, setWipeFrom] = useState<string | null>(null)
+  useLayoutEffect(() => {
+    const prev = prevImage.current
+    prevImage.current = image
+    if (!hiddenImage || prev !== hiddenImage || image === hiddenImage) return
+    setWipeFrom(prev)
+    const t = setTimeout(() => setWipeFrom(null), REVEAL_MS)
+    return () => clearTimeout(t)
+  }, [image, hiddenImage])
   if (!dealt) return <div className={`bingo-card is-${side} is-empty`} />
   const lineSet = new Set(line)
   return (
     <div className={`bingo-card is-${side}${win ? ' is-win' : ''}`}>
-      <img className="bingo-sheet" src={image} alt="" draggable={false} />
+      {wipeFrom && <img className="bingo-sheet" src={wipeFrom} alt="" draggable={false} />}
+      <img className={`bingo-sheet${wipeFrom ? ' is-wipe-in' : ''}`} src={image} alt="" draggable={false} />
       {letters.map((_, i) =>
         open.has(i) ? (
           <img
@@ -549,10 +712,21 @@ function DeckList({
   flipped: BingoItem[]
   hidden: boolean
 }) {
+  // ？が公開された間だけ、左上からじわーっと出していく
+  const prevHidden = useRef(hidden)
+  const [wipe, setWipe] = useState(false)
+  useLayoutEffect(() => {
+    const was = prevHidden.current
+    prevHidden.current = hidden
+    if (!was || hidden) return
+    setWipe(true)
+    const t = setTimeout(() => setWipe(false), REVEAL_MS)
+    return () => clearTimeout(t)
+  }, [hidden])
   const items = inDeck ? marks(list, flipped) : list.map((c) => ({ c, used: false }))
   const allQ = items.every(({ used }) => !inDeck || (hidden && !used))
   return (
-    <p className={`bingo-deck-list is-${side}${allQ ? ' is-all-q' : ''}`}>
+    <p className={`bingo-deck-list is-${side}${allQ ? ' is-all-q' : ''}${wipe ? ' is-wipe-in' : ''}`} style={{ fontSize: DECK_LIST_PX }}>
       {items.map(({ c, used }, i) => (
         <span key={i} className={`${used ? 'is-used' : ''}${!inDeck || (hidden && !used) ? ' is-q' : ''}`}>
           {i > 0 && <i>・</i>}

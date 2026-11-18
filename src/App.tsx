@@ -73,12 +73,18 @@ function PlayerHiddenMenu({ team, onReset, onReconnect }: { team: number; onRese
             : stage > 2 || phase === 'end'
               ? names.flatMap((n) => idOf(n) ?? [])
               : []
+        // ステージ4のROUND2でサッカーボール7個を1つ発送していて、リストにも載っている（LAST の最初は在庫 4/5）
+        const pastStage4 = stage >= 5 || phase === 'end'
+        const ballId = products.find((p) => p.name.replace(/\s/g, '').startsWith('サッカーボール'))?.id
         const stage2Played = found > 0
         // ステージ3：押さえてワードの位置。それより後は、注文まで済んでいる
         const wordSteps = ['rule', 'g1', 'g2', 'room'] as const
         const wordStep =
           stage === 3 && phase === 'game' ? (wordSteps.find((w) => w === step) ?? 'rule') : stage > 3 || phase === 'end' ? 'room' : 'rule'
         const pastStage3 = stage > 3 || phase === 'end'
+        // 金庫は第3ゲームで検索する想定。お題（部屋）が出たあとのシーンは、金庫がリストに加わった状態で始める
+        const safeId = idOf('金庫')
+        const safeIn = stage > 3 || phase === 'end' || (stage === 3 && (phase === 'clear' || (phase === 'game' && wordStep === 'room')))
         // ステージ4：ビンゴの位置。説明が済んでいれば、キモチとジャック機能が使える
         const bingoSteps: BingoStep[] = ['rule', 'r1', 'r2']
         const bingoStep: BingoStep =
@@ -91,8 +97,12 @@ function PlayerHiddenMenu({ team, onReset, onReconnect }: { team: number; onRese
             phase,
             locked: false,
             order: null,
-            orderedQty: [...(pastStage1 ? game1OrderedQty() : []), ...(pastStage3 ? stage3OrderedQty() : [])],
-            searched,
+            orderedQty: [
+              ...(pastStage1 ? game1OrderedQty() : []),
+              ...(pastStage3 ? stage3OrderedQty() : []),
+              ...(pastStage4 && ballId ? [{ id: ballId, qty: 1 }] : []),
+            ],
+            searched: [...searched, ...(safeIn && safeId ? [safeId] : []), ...(pastStage4 && ballId ? [ballId] : [])],
             // ステージ1のゲーム2（正しい注文）は、特定が終わったあとの子供部屋
             markCleared: stage === 1 && step === 'order',
             // ステージ1の説明：マーク当ての途中から入るときだけ、まだ解けていない

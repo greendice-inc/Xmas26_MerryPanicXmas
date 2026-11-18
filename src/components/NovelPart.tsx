@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { backgroundImage, characterImage, type Emotion, type NovelLine, type NovelScene } from '../scenario'
 import MoodCard from './MoodCard'
 
@@ -31,6 +31,7 @@ function CharSlot({
   speaking,
   talking,
   happy,
+  shifted,
 }: {
   pos: 'left' | 'right' | 'center'
   folder?: string
@@ -40,9 +41,11 @@ function CharSlot({
   speaking: boolean
   talking: boolean
   happy?: boolean
+  /** 中央に画像を出しているので、左へよける */
+  shifted?: boolean
 }) {
   return (
-    <div className={`novel-char pos-${pos}${speaking ? '' : ' is-silent'}`}>
+    <div className={`novel-char pos-${pos}${speaking ? '' : ' is-silent'}${shifted ? ' is-shifted' : ''}`}>
       <div className={`novel-char-body ${speaking && talking ? 'talking' : ''}`}>
         {src ? (
           <img src={src} alt="" />
@@ -104,7 +107,13 @@ export default function NovelPart({
     }
     play(line.se)
     const voice = play(line.voice)
-    return () => voice?.pause()
+    // フルボイスの台詞（auto）：音声が鳴り終わったら、タップを待たずに次へ。音声が無い台詞は、タップで進む
+    const onEnded = () => advanceRef.current()
+    if (line.auto && voice) voice.addEventListener('ended', onEnded)
+    return () => {
+      voice?.removeEventListener('ended', onEnded)
+      voice?.pause()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, ready])
   const segs = parse(line.text)
@@ -132,6 +141,8 @@ export default function NovelPart({
     return () => clearInterval(t)
   }, [idx, ready, total])
 
+  // 音声が鳴り終わったときの「次へ」（文字が出きっていなくても進む）
+  const advanceRef = useRef<() => void>(() => {})
   const next = () => {
     if (!ready) {
       // 登場演出をスキップ
@@ -148,6 +159,14 @@ export default function NovelPart({
     } else {
       onFinish()
     }
+  }
+
+  advanceRef.current = () => {
+    if (isLast && endButton) return
+    if (idx + 1 < scene.lines.length) {
+      setShown(0)
+      setIdx(idx + 1)
+    } else onFinish()
   }
 
   // 文字数分だけ表示する（強調の色は保つ）
@@ -192,6 +211,7 @@ export default function NovelPart({
         speaking
         talking={talking}
         happy={happy}
+        shifted={!!line.slide}
       />
       )}
 

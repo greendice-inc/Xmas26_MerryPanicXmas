@@ -6,8 +6,9 @@ import { useProducts } from '../santazon/useProducts'
 import GameTalk, { hl } from '../components/GameTalk'
 import { lineImage } from '../script/gameScenes'
 import { RECORDS, ST2_KIDS, st2GameImage, type NovelLine } from '../scenario'
-import { useGameLines } from '../script/scriptData'
+import { lineIndex, useGameLines } from '../script/scriptData'
 import type { HideProgress, TeamDoc } from '../types'
+import { GuideArrow } from './Stage1Guide'
 import {
   areasToCode,
   resetHideAreas,
@@ -25,25 +26,22 @@ const CARD_ID = 'st2-card'
 /** 案内が求める操作。tap=タップで次へ / shop=注文を開く / tab=リスト登録タブを押す / search=マネキンを検索する */
 type Wait = 'tap' | 'shop' | 'tab' | 'search'
 
-/** リスト追加検索の案内（st2-tutorial）の、行ごとの演出。書いていない行はタップで次へ */
-const TUTORIAL_FX: Record<number, { wait: Wait; card?: 'show' | 'fly' }> = {
-  4: { wait: 'shop' },
-  5: { wait: 'tab' },
-  8: { wait: 'tap', card: 'fly' },
-  9: { wait: 'search' },
+/** リスト追加検索の案内（st2-tutorial）の、行ごとの演出。行の名前は script/gameScenes.ts の tag。書いていない行はタップで次へ */
+const TUTORIAL_FX: Record<string, { wait: Wait; card?: 'show' }> = {
+  'open-shop': { wait: 'shop' },
+  tab: { wait: 'tab' },
+  'mannequin-card': { wait: 'tap', card: 'show' },
+  search: { wait: 'search' },
 }
-const fxOf = (i: number) => TUTORIAL_FX[i] ?? { wait: 'tap' as Wait }
-const SHOP_STEP = 4
-const TAB_STEP = 5
-const SEARCH_STEP = 9
+const fxOf = (id?: string) => TUTORIAL_FX[id ?? ''] ?? { wait: 'tap' as Wait }
 /** 案内のこの行（アミーのヒント）は、ラウンド1のあいだ右上に小さく出しておく */
-const CORNER_HINT = 11
+const CORNER_HINT = 'corner-hint'
 
-/** 見つけられたあとの台詞（st2-amy など）。hint は右下のアイコン（アミー）から聞き直せる質問の行、banner は台詞のあとに出す */
-const FOUND: Record<'amy' | 'jimmy' | 'tommy', { scene: string; hint: number[]; banner?: string }> = {
-  amy: { scene: 'st2-amy', hint: [6, 7, 8, 9, 10], banner: 'ラウンド2　ジミーを見つけよう。' },
-  jimmy: { scene: 'st2-jimmy', hint: [5, 6, 7, 8], banner: 'ラウンド3　トミーを見つけよう。' },
-  tommy: { scene: 'st2-tommy', hint: [] },
+/** 見つけられたあとの台詞（st2-amy など）。hint は右下のアイコン（アミー）から聞き直せる質問の行（hint-from〜hint-to の行）、banner は台詞のあとに出す */
+const FOUND: Record<'amy' | 'jimmy' | 'tommy', { scene: string; hint: boolean; banner?: string }> = {
+  amy: { scene: 'st2-amy', hint: true, banner: 'ラウンド2　ジミーを見つけよう。' },
+  jimmy: { scene: 'st2-jimmy', hint: true, banner: 'ラウンド3　トミーを見つけよう。' },
+  tommy: { scene: 'st2-tommy', hint: false },
 }
 
 /** 見つけた人数 → 次に探す子と、その子が正解になる条件の商品 */
@@ -84,8 +82,14 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
   const tutorialLines = useGameLines('st2-tutorial')
   const foundLines = { amy: useGameLines('st2-amy'), jimmy: useGameLines('st2-jimmy'), tommy: useGameLines('st2-tommy') }
   const missLines = useGameLines('st2-miss')
+  const cornerHint = tutorialLines.find((l) => l.id === CORNER_HINT)
   const lineText = tutorial ? tutorialLines[step] : undefined
-  const line = lineText ? { ...fxOf(step), talk: lineText } : undefined
+  const line = lineText ? { ...fxOf(lineText.id), talk: lineText } : undefined
+  // 演出の節目の行（名前で探す）。行を足したり並べ替えても、番号はここで取り直す
+  const SHOP_STEP = lineIndex(tutorialLines, 'open-shop')
+  const TAB_STEP = lineIndex(tutorialLines, 'tab')
+  const SEARCH_STEP = lineIndex(tutorialLines, 'search')
+  const stepsOk = SHOP_STEP >= 0 && TAB_STEP > SHOP_STEP && SEARCH_STEP > TAB_STEP
 
   // 画面の外（注文ボタン）まで覆うため、案内などはプレイヤー画面の上に出す
   const [host, setHost] = useState<HTMLElement | null>(null)
@@ -99,27 +103,28 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
     if (!line) return
     if (line.wait === 'shop' && shopOpen) setStep(step + 1)
     if (line.wait === 'tab' && shopOpen && szTab === 'search') setStep(step + 1)
-    if (line.wait === 'search' && searchedNames.has('マネキン')) setStep(step + 1)
+    // 検索した結果を閉じて、リスト画面に戻ったら次へ
+    if (line.wait === 'search' && searchedNames.has('マネキン') && szTab === 'list') setStep(step + 1)
   })
 
   // 途中で Santazon を閉じたら、開くところからやり直す
   useEffect(() => {
     // マネキンを検索するまで。そのあとは自由に閉じてよい
-    if (!tutorial || step <= SHOP_STEP || step > SEARCH_STEP) return
+    if (!tutorial || !stepsOk || step <= SHOP_STEP || step > SEARCH_STEP) return
     if (!shopOpen) setStep(SHOP_STEP)
-    else if (step > TAB_STEP && szTab !== 'search') setStep(TAB_STEP)
+    else if (step > TAB_STEP && szTab !== 'search' && !searchedNames.has('マネキン')) setStep(TAB_STEP)
   }, [tutorial, step, shopOpen, szTab])
 
   // リスト追加検索のタブは、押すように言うところで出てくる
   useEffect(() => {
-    if (tutorial && step >= TAB_STEP && !doc.searchUnlocked) update({ searchUnlocked: true })
+    if (tutorial && stepsOk && step >= TAB_STEP && !doc.searchUnlocked) update({ searchUnlocked: true })
   }, [tutorial, step, doc.searchUnlocked, update])
 
   useEffect(() => {
     onGuide({
       menu: !!line && line.wait === 'shop',
       // 検索してもらう行と、検索のあとは、Santazon を触れる
-      sz: line?.wait === 'tab' ? 'tab' : line && step > TAB_STEP && step < SEARCH_STEP ? 'talk' : null,
+      sz: !stepsOk ? null : line?.wait === 'tab' ? 'tab' : line && step === SEARCH_STEP ? 'drag2' : line?.talk.id === 'searched-list' ? 'searched' : line && step > TAB_STEP && step < SEARCH_STEP ? 'talk' : null,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line?.wait, step, onGuide])
@@ -127,7 +132,7 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
 
   const tapTutorial = () => {
     if (!line || line.wait !== 'tap') return
-    if (line.card === 'fly') {
+    if (line.card) {
       const records = doc.records ?? []
       if (!records.includes(CARD_ID)) update({ records: [...records, CARD_ID] })
     }
@@ -137,20 +142,6 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
       setGoal(true)
     }
   }
-
-  // カードが「記録」ボタンへ飛んでいく先（プレイヤー画面の座標）
-  const [flyTo, setFlyTo] = useState<{ x: number; y: number } | null>(null)
-  useLayoutEffect(() => {
-    if (line?.card !== 'fly' || !host) return setFlyTo(null)
-    const btn = host.querySelector<HTMLElement>('[data-menu="記録"]')
-    if (!btn) return setFlyTo(null)
-    const r = host.getBoundingClientRect()
-    const s = r.width / host.offsetWidth
-    const b = btn.getBoundingClientRect()
-    setFlyTo({ x: (b.left + b.width / 2 - r.left) / s - host.offsetWidth / 2, y: (b.top + b.height / 2 - r.top) / s - host.offsetHeight / 2 })
-    // line は描画のたびに作り直すので、行の番号で見る
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line?.card, step, host])
 
   // ---------- 見つける ----------
   const [elfSays, setElfSays] = useState<NovelLine | null>(null)
@@ -173,8 +164,9 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
     if (tutorial || celebrate || talk || found >= 3) return
     const target = TARGETS[found]
     const ready = searchedNames.has(target.item)
-    if (!ready && found > 0) return setElfSays(missLines[0])
-    if (!ready || area.role !== target.role) return setElfSays(missLines[1])
+    const miss = (id: string, fallback: number) => missLines.find((l) => l.id === id) ?? missLines[fallback]
+    if (!ready && found > 0) return setElfSays(miss('unsure', 0))
+    if (!ready || area.role !== target.role) return setElfSays(miss('wrong', 1))
     if (target.role === 'dummy') {
       // ダミーも、ほかの子と同じ「みーつけた！」。そのあと発表
       setCelebrate(area)
@@ -212,9 +204,15 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
 
   // 右下のアイコン：最後に見つけた子（トミーは除く）
   const lastKid = found === 1 ? 'amy' : found === 2 ? 'jimmy' : null
+  // アイコンは、「もう一度聞きたい場合は右下のアイコンを〜」と言ったあとの行から出す（最初に聞いている間だけ）
+  const iconAt = lastKid ? lineIndex(foundLines[lastKid], 'icon-hint') : -1
+  const iconHidden = !!talk && !!lastKid && talk.lines === foundLines[lastKid] && iconAt >= 0 && talk.idx <= iconAt
   const replayHint = () => {
     if (!lastKid) return
-    const hint = FOUND[lastKid].hint.map((i) => foundLines[lastKid][i]).filter(Boolean)
+    const all = foundLines[lastKid]
+    const from = lineIndex(all, 'hint-from')
+    const to = lineIndex(all, 'hint-to')
+    const hint = FOUND[lastKid].hint && from >= 0 && to >= from ? all.slice(from, to + 1) : []
     if (hint.length) setTalk({ role: lastKid, lines: hint, idx: 0 })
   }
 
@@ -283,21 +281,21 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
       )}
 
       {/* ラウンド1（アミーを見つけるまで）、エルフのヒントを右上に小さく出しておく */}
-      {!editing && !tutorial && found === 0 && tutorialLines[CORNER_HINT] && (
+      {!editing && !tutorial && found === 0 && cornerHint && (
         <div className="hide-corner-hint">
-          <p>{hl(tutorialLines[CORNER_HINT].text)}</p>
-          <img src={lineImage(tutorialLines[CORNER_HINT])} alt="" />
+          <p>{hl(cornerHint.text)}</p>
+          <img src={lineImage(cornerHint)} alt="" />
         </div>
       )}
 
       {!editing && !tutorial && (
         <>
-          {lastKid && (
+          {lastKid && !iconHidden && (
             <button className="hide-kid-icon" onClick={replayHint} aria-label="アミーへの質問をもう一度聞く">
               <img src={ST2_KIDS.amy.image} alt="" />
             </button>
           )}
-          {lastKid && <span className="hide-kid-label">質問をもう一度聞く</span>}
+          {lastKid && !iconHidden && <span className="hide-kid-label">質問をもう一度聞く</span>}
         </>
       )}
 
@@ -318,16 +316,15 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
         overlay(
           <>
             {line.wait === 'tap' && <div className="hide-catch" onClick={tapTutorial} />}
-            {line.card && (
-              <img
-                key={line.card}
-                className={`hide-card${line.card === 'fly' ? ' is-fly' : ''}`}
-                src={RECORDS[CARD_ID].image}
-                alt=""
-                style={flyTo ? { ['--fx' as string]: `${flyTo.x}px`, ['--fy' as string]: `${flyTo.y}px` } : undefined}
-              />
+            {/* 「リスト登録」タブ（x=1360〜1880、下端 y=140）を下から指す */}
+            {line.wait === 'tab' && <GuideArrow key="tab-arrow" x={1620} y={146} up />}
+            {line.card && <img key={line.card} className="hide-card" src={RECORDS[CARD_ID].image} alt="" />}
+            {line.wait === 'search' ? (
+              // 検索してもらう行は、しゃべらせず、右上にダイアログだけ出しておく
+              <div className="hide-search-dialog">{hl(line.talk.text)}</div>
+            ) : (
+              <GameTalk line={line.talk} compact={compact} wait={line.wait !== 'tap'} />
             )}
-            <GameTalk key={step} line={line.talk} compact={compact} wait={line.wait !== 'tap'} />
           </>,
         )}
 
@@ -353,7 +350,7 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
         overlay(
           <>
             <div className="hide-catch" onClick={nextTalk} />
-            <GameTalk key={`${talk.role}${talk.idx}`} line={talk.lines[talk.idx]} compact={compact} />
+            <GameTalk line={talk.lines[talk.idx]} compact={compact} />
           </>,
         )}
     </div>

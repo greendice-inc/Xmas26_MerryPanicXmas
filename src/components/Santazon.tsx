@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { GuideArrow } from '../games/Stage1Guide'
 import {
   CATEGORIES,
   MAX_CART,
@@ -9,11 +10,16 @@ import {
 } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { isBingoCart, roundOf, SURPRISE_KID_ORDER, SURPRISE_NAME } from '../games/bingoData'
-import { isLastCart, lastOrderGate } from '../games/lastData'
+
+/** 「注文が確定しました」を自動で閉じるまで。商品が届く（PlayerScreen の DELIVER_MS）より前に閉じる */
+const CONFIRM_MS = 3000
+import { isLastCart, lastOrderGate, type LastGate } from '../games/lastData'
+import { hl } from './GameTalk'
+import { useGameLines } from '../script/scriptData'
 import { LAST_STAGE } from '../config'
 import { characterImage } from '../scenario'
 import TenKey from './TenKey'
-import type { OrderItem, TeamDoc } from '../types'
+import { DEFAULT_LAST, type OrderItem, type TeamDoc } from '../types'
 
 interface Props {
   doc: TeamDoc
@@ -34,6 +40,12 @@ interface Props {
   onRequest?: (code: string) => RequestResult
   /** 届いた注文のナゾ（宅配ソックスのナゾ）をもう一度開く */
   onOpenProblem?: () => void
+  /** 「注文が確定しました」を閉じたとき */
+  onConfirmedClose?: () => void
+  /** 取り出し依頼ボタンを光らせる（ステージ4 ROUND1 の説明） */
+  requestGlow?: boolean
+  /** 届いたあと、ナゾを開くまで「ソックスキーを導く」ボタンを光らせる */
+  sockGlow?: boolean
 }
 
 /** ok=取り出せた / wrong=番号が違う / none=いま取り出せるものがない */
@@ -71,8 +83,8 @@ const CAT_TABS: { key: CategoryKey; img: string; label: string; from: number }[]
 ]
 
 export type SzTab = 'list' | 'search'
-/** tab=リスト追加検索タブを目立たせる / talk=説明中（どこも触れない） */
-export type SzGuide = 'tab' | 'talk'
+/** tab=リスト追加検索タブを目立たせる / talk=説明中（どこも触れない） / drag2=「2」を枠へドラッグしてもらう（「2」と枠と検索と結果の閉じるだけ触れる） / searched=リスト画面で「登録済みアイテム」を矢印で示す（どこも触れない） */
+export type SzGuide = 'tab' | 'talk' | 'drag2' | 'searched'
 
 /** リスト追加検索で、検索済みリストに載せてよい商品（名前が一致するか、前方一致） */
 const SEARCH_LIST_NAMES = new Set(['マネキン', 'セーター', 'オーバーオール', 'スーパーボール', 'エントツ', '金庫'])
@@ -85,7 +97,7 @@ function ProductImage({ p }: { p: Product }) {
 }
 
 /** 注文画面「Santazon」。見た目はネット通販サイト風 */
-export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem }: Props) {
+export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem, onConfirmedClose, sockGlow, requestGlow }: Props) {
   const { products } = useProducts()
   const productById = (id: string) => products.find((p) => p.id === id)
   const [ownTab, setOwnTab] = useState<SzTab>('list')
@@ -103,12 +115,104 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   const [showSearched, setShowSearched] = useState(false)
   const [detail, setDetail] = useState<Product | null>(null)
   const [help, setHelp] = useState(false)
+  // リストはバーを出さず、ドラッグでスクロールする。いちばん上にいて下に続きがあるときは、▼でサインを出す
+  const listRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ id: number; y: number; top: number; moved: boolean } | null>(null)
+  const justDragged = useRef(false)
+  // moreBelow=まだ下に続く（白いグラデーション）/ atTop=いちばん上（▼のサイン）
+  const [scrollState, setScrollState] = useState({ moreBelow: false, atTop: false })
+  const checkMore = () => {
+    const el = listRef.current
+    const moreBelow = !!el && el.scrollTop + el.clientHeight < el.scrollHeight - 4
+    const atTop = moreBelow && !!el && el.scrollTop < 8
+    setScrollState((p) => (p.moreBelow === moreBelow && p.atTop === atTop ? p : { moreBelow, atTop }))
+  }
+  const onListDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // 指（タッチ）は、ブラウザ自身のスクロールに任せる。マウス・ペンだけドラッグで動かす
+    if (e.pointerType === 'touch' || e.button !== 0) return
+    dragRef.current = { id: e.pointerId, y: e.clientY, top: e.currentTarget.scrollTop, moved: false }
+  }
+  const onListMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current
+    const el = listRef.current
+    if (!d || !el || d.id !== e.pointerId) return
+    // 画面は拡縮されているので、ポインタの動きを、このリストの中の長さに直す
+    const k = el.getBoundingClientRect().height / el.offsetHeight || 1
+    const dy = (e.clientY - d.y) / k
+    if (!d.moved && Math.abs(dy) < 8) return
+    if (!d.moved) {
+      d.moved = true
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        /* 取れなくてもスクロールはできる */
+      }
+    }
+    el.scrollTop = d.top - dy
+  }
+  const onListUp = () => {
+    // ドラッグしたあとは、離した場所のボタンを押したことにしない
+    if (dragRef.current?.moved) {
+      justDragged.current = true
+      setTimeout(() => (justDragged.current = false), 0)
+    }
+    dragRef.current = null
+  }
+  // 案内「登録済みアイテム」の矢印の先（この画面の座標）
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [searchedArrow, setSearchedArrow] = useState<{ x: number; y: number } | null>(null)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    const btn = root?.querySelector<HTMLElement>('.sz-cat.is-wide')
+    if (guide !== 'searched' || tab !== 'list' || !root || !btn) return setSearchedArrow(null)
+    const r = root.getBoundingClientRect()
+    const k = r.width / root.offsetWidth
+    const b = btn.getBoundingClientRect()
+    setSearchedArrow({ x: (b.left + b.width / 2 - r.left) / k, y: (b.bottom - r.top) / k + 4 })
+  }, [guide, tab])
   const [rejected, setRejected] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const closeConfirmed = () => {
+    setConfirmed(false)
+    onConfirmedClose?.()
+  }
+  // 「注文が確定しました」は、少しして自動で閉じる（届くのは、これより後）
+  const closeRef = useRef(closeConfirmed)
+  closeRef.current = closeConfirmed
+  useEffect(() => {
+    if (!confirmed) return
+    const t = setTimeout(() => closeRef.current(), CONFIRM_MS)
+    return () => clearTimeout(t)
+  }, [confirmed])
   const [requesting, setRequesting] = useState(false)
   // 注文を止めたときのメッセージ（真ん中の表示 → エルフ）
-  const [gate, setGate] = useState<{ center?: string; elf?: string } | null>(null)
+  const [gate, setGate] = useState<LastGate | null>(null)
+  // 会話（scene）のときの、いま何行目か
+  const [gateIdx, setGateIdx] = useState(0)
+  const gateLines = { basket: useGameLines('st5-basket'), again: useGameLines('st5-again'), final: useGameLines('st5-final'), wrong: useGameLines('st5-wrong') }
   const [requestMsg, setRequestMsg] = useState<string | null>(null)
+
+  // 中央の表示を閉じたら、エルフの会話（またはひと言）へ
+  const closeGateCenter = () => {
+    setGateIdx(0)
+    setGate(gate ? { elf: gate.elf, scene: gate.scene } : null)
+  }
+  // 最後のチャンスの通告への答え。はい＝発送の判定へ（不正解ならはじく）/ いいえ＝そのまま閉じる
+  const answerFinal = (yes: boolean) => {
+    setGate(null)
+    setGateIdx(0)
+    if (yes) confirm(true)
+  }
+  // 会話を1行進める。最後まで話したら閉じる（埋まっていた話のあとは、取り出し依頼ボタンが使えるようになる）
+  const nextGate = () => {
+    if (!gate?.scene) return
+    if (gateIdx + 1 < gateLines[gate.scene].length) return setGateIdx(gateIdx + 1)
+    if (gate.scene === 'basket') update({ last: { ...DEFAULT_LAST, ...doc.last, basketTold: true } })
+    setGate(null)
+    setGateIdx(0)
+  }
+  // LAST：空になる前（会話を聞く前）と、空になったあとは、取り出し依頼ボタンを押せない
+  const requestOff = isLast && !(doc.last?.step === 'basket' && !!doc.last?.basketTold)
 
   // 届く途中・解答中は新しい注文ができない。考え直す注文と、解き終わった注文は入れ直せる
   const ordering = !!doc.order && (doc.order.status === 'ordered' || doc.order.status === 'delivered')
@@ -134,11 +238,18 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   const dec = (id: string) =>
     setCart((c) => c.flatMap((i) => (i.id !== id ? [i] : i.qty > 1 ? [{ ...i, qty: i.qty - 1 }] : [])))
 
-  const confirm = () => {
+  const confirm = (finalTold = false) => {
     if (!cart.length || ordering) return
+    // LAST の最後（ルドリーのための注文）：中身が何であっても、先に「最後のチャンス」の通告を出す。通告のあとで、普通に判定する
+    if (isLast && doc.last?.step === 'super' && !finalTold) {
+      setGateIdx(0)
+      setGate({ scene: 'final' })
+      return
+    }
     // LAST：宅配ソックスが埋まっている・見落としがあるなど、決まった注文だけ特別なメッセージで止める
     const stop = isLast ? lastOrderGate(doc.last?.step, cart, products) : null
     if (stop) {
+      setGateIdx(0)
       setGate(stop)
       return
     }
@@ -171,6 +282,12 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   const listed = products.filter((p) => p.category === selected && p.listed)
   const searchedProducts = doc.searched.map(productById).filter((p): p is Product => !!p)
   const rows = showSearched ? searchedProducts : listed
+  // リストの中身が変わったとき（タブ・カテゴリ・件数）にだけ、スクロールのサインを確かめる。
+  // 毎回の描画で確かめると、サインの出入りで描画が止まらなくなることがある
+  useLayoutEffect(() => {
+    checkMore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selected, showSearched, rows.length])
   const openSearched = () => {
     setTab('list')
     setShowSearched(true)
@@ -181,7 +298,8 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
 
   return (
     <div
-      className={`santazon is-${tab}${guide ? ' is-guided' : ''}`}
+      ref={rootRef}
+      className={`santazon is-${tab}${guide ? ' is-guided' : ''}${guide === 'drag2' ? ' is-drag2' : ''}`}
       style={{ backgroundImage: `url("${tab === 'list' ? SZ.backList : SZ.backSearch}")` }}
     >
       <button className="sz-home" onClick={onClose} aria-label="ホームに戻る" />
@@ -219,7 +337,21 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
             </button>
           </nav>
 
-          <div className="sz-list">
+          <div
+            className="sz-list"
+            ref={listRef}
+            onScroll={checkMore}
+            onPointerDown={onListDown}
+            onPointerMove={onListMove}
+            onPointerUp={onListUp}
+            onPointerCancel={onListUp}
+            onClickCapture={(e) => {
+              if (justDragged.current) {
+                e.stopPropagation()
+                e.preventDefault()
+              }
+            }}
+          >
             {rows.length === 0 && (
               <div className="sz-empty">{showSearched ? 'まだ登録したアイテムはありません' : 'このカテゴリに掲載中の商品はありません'}</div>
             )}
@@ -255,6 +387,9 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
             })}
           </div>
 
+          {scrollState.moreBelow && <div className="sz-scroll-fade" aria-hidden />}
+          {scrollState.atTop && <div className="sz-scroll-hint" aria-hidden>▼</div>}
+
           <aside className="sz-cart">
             {Array.from({ length: MAX_CART }, (_, i) => {
               const p = units[i] ? productById(units[i]) : undefined
@@ -269,14 +404,14 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
                 </div>
               )
             })}
-            <button className="sz-order" disabled={!cart.length || ordering} onClick={confirm} aria-label={ordering ? '発送済み' : '注文する'}>
+            <button className="sz-order" disabled={!cart.length || ordering} onClick={() => confirm()} aria-label={ordering ? '発送済み' : '注文する'}>
               <img src={ordering ? SZ.shipped : SZ.order} alt="" draggable={false} />
             </button>
-            <button className="sz-side-btn is-sock" disabled={!delivered || !onOpenProblem} onClick={onOpenProblem} aria-label="ソックスキーを導く">
+            <button className={`sz-side-btn is-sock${sockGlow ? ' is-glow' : ''}`} disabled={!delivered || !onOpenProblem} onClick={onOpenProblem} aria-label="ソックスキーを導く">
               <img src={SZ.sockKey} alt="" draggable={false} />
             </button>
             {onRequest && (
-              <button className="sz-side-btn is-request" onClick={() => setRequesting(true)} aria-label="エルフに取り出し依頼">
+              <button className={`sz-side-btn is-request${requestGlow ? ' is-glow' : ''}`} disabled={requestOff} onClick={() => setRequesting(true)} aria-label="エルフに取り出し依頼">
                 <img src={SZ.request} alt="" draggable={false} />
               </button>
             )}
@@ -294,9 +429,19 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
             if (addIds.length) update({ searched: [...doc.searched, ...addIds] })
           }}
           onOpenSearched={openSearched}
-          guided={!!guide}
+          // LAST：警告を受けたあと（ルドリーのためのスーパーボールを探す場面）は、説明文の下に一文が足される
+          extraLine={isLast && doc.last?.step === 'super' ? LAST_EXTRA_LINE : undefined}
+          guide={guide ?? null}
+          // 案内中は、結果を閉じたら自動でリスト画面に戻る
+          onResultClosed={() => {
+            if (guide !== 'drag2') return
+            setTab('list')
+            setShowSearched(false)
+          }}
         />
       )}
+
+      {searchedArrow && <GuideArrow key="searched-arrow" x={searchedArrow.x} y={searchedArrow.y} up />}
 
       {detail && (
         <div className="sz-dialog-back" onClick={() => setDetail(null)}>
@@ -356,14 +501,32 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
       )}
 
       {gate?.center && (
-        <div className="sz-dialog-back" onClick={() => setGate({ elf: gate.elf })}>
+        <div className="sz-dialog-back" onClick={() => closeGateCenter()}>
           <div className="sz-dialog sz-gate" onClick={(e) => e.stopPropagation()}>
-            <p>{gate.center}</p>
-            <button className="sz-btn sz-yellow" onClick={() => setGate({ elf: gate.elf })}>閉じる</button>
+            <p style={{ whiteSpace: 'pre-line' }}>{gate.center}</p>
+            <button className="sz-btn sz-yellow" onClick={() => closeGateCenter()}>閉じる</button>
           </div>
         </div>
       )}
-      {gate && !gate.center && gate.elf && (
+      {gate && !gate.center && gate.scene && gateLines[gate.scene][gateIdx] && (
+        <div className="sz-elf-back" onClick={gate.scene === 'final' && gateIdx + 1 >= gateLines.final.length ? undefined : nextGate}>
+          <div className="sz-elf-line">
+            <img src={characterImage('Common', gateLines[gate.scene][gateIdx].emotion ?? '真顔')} alt="" />
+            <p className="is-pre">
+              <span>{gateLines[gate.scene][gateIdx].speaker}</span>
+              {hl(gateLines[gate.scene][gateIdx].text)}
+            </p>
+          </div>
+          {/* 最後のチャンスの通告：はい＝判定へ / いいえ＝そのまま閉じる（最後の行で選ぶ） */}
+          {gate.scene === 'final' && gateIdx + 1 >= gateLines.final.length && (
+            <div className="sz-choice">
+              <button className="sz-btn sz-yellow" onClick={() => answerFinal(true)}>はい</button>
+              <button className="sz-btn sz-light" onClick={() => answerFinal(false)}>いいえ</button>
+            </div>
+          )}
+        </div>
+      )}
+      {gate && !gate.center && !gate.scene && gate.elf && (
         <div className="sz-elf-back" onClick={() => setGate(null)}>
           <div className="sz-elf-line">
             <img src={characterImage('Common', '真顔')} alt="" />
@@ -388,10 +551,10 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
       )}
 
       {confirmed && (
-        <div className="sz-dialog-back" onClick={() => setConfirmed(false)}>
+        <div className="sz-dialog-back" onClick={closeConfirmed}>
           <div className="sz-dialog" onClick={(e) => e.stopPropagation()}>
             <p>注文が確定しました。商品が届くまでしばらくお待ちください。</p>
-            <button className="sz-btn sz-yellow" onClick={() => setConfirmed(false)}>閉じる</button>
+            <button className="sz-btn sz-yellow" onClick={closeConfirmed}>閉じる</button>
           </div>
         </div>
       )}
@@ -428,8 +591,10 @@ const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 const HINT_LINES = [
   '画面中のオレンジの文字を引っ張って、',
   'バーで繋がれた4つのパープルの枠に当てはめることで',
-  'アイテムを指定すること',
+  'アイテムを指定すること。',
 ]
+/** LAST：警告を受けたあと、説明文の下にしれっと足す一文（この文字を使って「スパボル」を並べられる） */
+const LAST_EXTRA_LINE = 'ボスエルフの命令により、もう大人部屋に入ることはできない。'
 
 /** 4桁のコードを、下の数字パネルをドラッグして四角にはめ込み、商品を検索する */
 function SearchTab({
@@ -437,15 +602,20 @@ function SearchTab({
   searched,
   onFound,
   onOpenSearched,
-  guided,
+  guide,
+  onResultClosed,
+  extraLine,
 }: {
   products: Product[]
   searched: string[]
   onFound: (ids: string[]) => void
   onOpenSearched: () => void
-  /** 説明中。下の説明文はいじれないので隠す */
-  guided: boolean
+  guide: SzGuide | null
+  onResultClosed: () => void
+  /** 説明文の下に足す一文 */
+  extraLine?: string
 }) {
+  const hintLines = extraLine ? [...HINT_LINES, extraLine] : HINT_LINES
   const rootRef = useRef<HTMLDivElement>(null)
 
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null, null])
@@ -481,6 +651,25 @@ function SearchTab({
   }
 
   const filled = slots.every((s) => s !== null)
+
+  // 「2」を枠へドラッグするところを、矢印でくり返し見せる（座標はこの画面の中）
+  const [arrow, setArrow] = useState<{ sx: number; sy: number; ex: number; ey: number } | null>(null)
+  const emptyIdx = slots.findIndex((v) => v === null)
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    const from = root?.querySelector<HTMLElement>('.sz-panel[aria-label="2"]')
+    const to = emptyIdx >= 0 ? root?.querySelector<HTMLElement>(`.sz-slot[data-slot="${emptyIdx}"]`) : null
+    if (guide !== 'drag2' || !root || !from || !to) return setArrow(null)
+    const r = root.getBoundingClientRect()
+    const k = r.width / root.offsetWidth
+    const at = (el: HTMLElement) => {
+      const b = el.getBoundingClientRect()
+      return { x: (b.left + b.width / 2 - r.left) / k, y: (b.top + b.height / 2 - r.top) / k }
+    }
+    const a = at(from)
+    const b = at(to)
+    setArrow({ sx: a.x, sy: a.y, ex: b.x, ey: b.y })
+  }, [guide, emptyIdx])
   const search = () => {
     const code = slots.join('')
     // 文字を並べたときだけの特別な検索（番号は要らない）
@@ -488,6 +677,10 @@ function SearchTab({
     const found = special ? products.filter((p) => p.name === special) : products.filter((p) => p.code === code)
     setResult(found.length ? found : 'none')
     onFound(found.map((p) => p.id))
+  }
+  const closeResult = () => {
+    setResult(null)
+    onResultClosed()
   }
   const clear = () => {
     setSlots([null, null, null, null])
@@ -506,6 +699,19 @@ function SearchTab({
         <span>{searched.length}</span>
       </button>
 
+      {/* デバッグモード（?debug=true）：リスト登録で出せるアイテムを、左に小さく出しておく */}
+      {new URLSearchParams(location.search).get('debug') === 'true' && (
+        <ul className="sz-debug-items" aria-hidden>
+          {products
+            .filter((p) => canList(p.name))
+            .map((p) => (
+              <li key={p.id}>
+                <b>{formatCode(p.code)}</b> {p.name}
+              </li>
+            ))}
+        </ul>
+      )}
+
       <div className="sz-slots">
         {slots.map((v, i) => (
           <div key={i} className="sz-slot-wrap">
@@ -523,21 +729,21 @@ function SearchTab({
       </div>
 
       <div className="sz-search-actions">
-        <button className="sz-btn sz-yellow" disabled={!filled} onClick={search}>検索</button>
+        <button className={`sz-btn sz-yellow${guide === 'drag2' && filled ? ' is-guide' : ''}`} disabled={!filled} onClick={search}>検索</button>
         <button className="sz-btn sz-light" onClick={clear}>クリア</button>
       </div>
 
       {/* 検索結果は、他の部品に押しつぶされないよう、上に重ねて出す */}
       <div className="sz-result" />
       {result && (
-        <div className="sz-result-back" onClick={() => setResult(null)}>
+        <div className="sz-result-back" onClick={closeResult}>
           <div className="sz-result-pop" onClick={(e) => e.stopPropagation()}>
             {result === 'none' ? (
               <div className="sz-result-none">該当する商品は見つかりませんでした</div>
             ) : (
               result.map((p) => <ProductDetail p={p} key={p.id} />)
             )}
-            <button className="sz-btn sz-yellow" onClick={() => setResult(null)}>閉じる</button>
+            <button className={`sz-btn sz-yellow${guide === 'drag2' ? ' is-guide' : ''}`} onClick={closeResult}>閉じる</button>
           </div>
         </div>
       )}
@@ -546,7 +752,7 @@ function SearchTab({
         {DIGITS.map((d) => (
           <button
             key={d}
-            className="sz-panel"
+            className={`sz-panel${guide === 'drag2' && d === '2' ? ' is-guide' : ''}`}
             aria-label={d}
             onPointerDown={down(d)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
             <img src={SZ.num(d)} alt="" draggable={false} />
@@ -554,8 +760,8 @@ function SearchTab({
         ))}
       </div>
 
-      <p className="sz-search-hint" style={guided ? { visibility: 'hidden' } : undefined}>
-        {HINT_LINES.map((line, li) => (
+      <p className="sz-search-hint">
+        {hintLines.map((line, li) => (
           <span className="sz-hint-line" key={li}>
             {[...line].map((ch, ci) =>
               ch === '、' || ch === '。' || ch === ' ' ? (
@@ -573,10 +779,21 @@ function SearchTab({
                 </button>
               ),
             )}
-            {li < HINT_LINES.length - 1 && <br />}
+            {li < hintLines.length - 1 && <br />}
           </span>
         ))}
       </p>
+
+      {arrow && !drag && (
+        <svg
+          className="sz-drag-arrow"
+          viewBox="0 0 120 150"
+          style={{ left: arrow.sx - 60, top: arrow.sy, ['--sx' as string]: '0px', ['--sy' as string]: '0px', ['--dx' as string]: `${arrow.ex - arrow.sx}px`, ['--dy' as string]: `${arrow.ey - arrow.sy}px` }}
+          aria-hidden
+        >
+          <path d="M38 144h44V74h32L60 6 6 74h32z" fill="#ff8a00" stroke="#2a2a30" strokeWidth="8" strokeLinejoin="round" />
+        </svg>
+      )}
 
       {drag && (
         <div className={`sz-panel sz-ghost${DIGITS.includes(drag.digit) ? '' : ' is-char'}`} style={{ left: drag.x - 77, top: drag.y - 77 }}>

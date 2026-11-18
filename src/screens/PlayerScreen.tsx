@@ -16,15 +16,19 @@ import WordGame from '../games/WordGame'
 import { GAME_COUNT, KV_IMAGE, LAST_STAGE, ROOM_BY_TEAM } from '../config'
 import { GAMES } from '../games'
 import { useTeam } from '../net/hooks'
-import { isCorrectCart, isGame1LoseCart, ORDER_STAGES, PROBLEMS } from '../santazon/products'
+import { isCorrectCart, ORDER_STAGES, sockKeyOfItems } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
-import { useScriptScene } from '../script/scriptData'
+import { useGameLines, useScriptScene } from '../script/scriptData'
+import { hl } from '../components/GameTalk'
 import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_MOOD, ST1_MOOD_AFTER, ST2_MOOD, ST3_MOOD, ST4_MOOD, type Mood } from '../scenario'
 import { adultWaitMs, setAdultSkip } from '../adultWait'
 import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../types'
 
 /** 正しい3点を注文してから、届いたポップアップが出るまで */
-const DELIVER_MS = 3000
+/** 注文から、商品が届くまで。「注文が確定しました」を自動で閉じる時間（Santazon の CONFIRM_MS）より、少し長くする */
+const DELIVER_MS = 3500
+/** ステージ4 ROUND2：ナゾを開いて少したってから出す案内 */
+const R2_HINT = 'これまでに発送した際のアイテムとソックスキーは、\n「記録」画面で確認できます。'
 const STAGE1_TASK = 'リンさんを勝たせる。ただし「失格」になってはいけない。'
 
 /** 暗転からのフェードインの長さ（styles.css の .fade-black と合わせる） */
@@ -104,6 +108,10 @@ export default function PlayerScreen({ team }: { team: number }) {
   const [szTab, setSzTab] = useState<SzTab>('list')
   const [cart, setCart] = useState<OrderItem[]>([])
   const [recordsOpen, setRecordsOpen] = useState(false)
+  // ステージ4 ROUND1 の説明で、取り出し依頼ボタンを光らせる
+  const [requestGlow, setRequestGlow] = useState(false)
+  // ステージ4：エルフ・ロビンが話している間は、下のボタンを押せない
+  const [bingoLock, setBingoLock] = useState(false)
   // ステージ2の案内で目立たせる場所
   const [guide, setGuide] = useState<{ menu: boolean; sz: SzGuide | null }>({ menu: false, sz: null })
   const onGuide = useCallback(
@@ -138,6 +146,8 @@ export default function PlayerScreen({ team }: { team: number }) {
   // 「アイテムが届きました」を閉じた注文（の時刻）と、ソックスキーのナゾを開いているか
   const [arrivedSeenAt, setArrivedSeenAt] = useState<number | null>(null)
   const [problemOpen, setProblemOpen] = useState(false)
+  // 「アイテムが届きました」のあと、ソックスキーを導くボタンを1回押すまで光らせる（押した注文の時刻）
+  const [sockPressedAt, setSockPressedAt] = useState<number | null>(null)
   // ステージ1の案内で、プレイヤーの操作を待っているもの
   const [guideWait, setGuideWait] = useState<GuideFx['wait'] | null>(null)
   // 正解直後、Firestore の反映を待たずにエルフを出すための時刻
@@ -160,6 +170,7 @@ export default function PlayerScreen({ team }: { team: number }) {
         : isCorrectCart(doc.stage, items)
   const bingoRound = doc.stage === BINGO_STAGE ? roundOf(doc.bingo?.step) : null
   const lastStep = doc.stage === LAST_STAGE ? (doc.last?.step ?? 'basket') : null
+  const ballsLines = useGameLines('st5-balls')
   /** LAST の注文の問題（エントツとボール・スーパーボールと金庫で別） */
   const lastProblem = lastStep ? LAST_PROBLEMS[lastStep] : undefined
 
@@ -177,21 +188,25 @@ export default function PlayerScreen({ team }: { team: number }) {
     }
     const order = doc.order
     if (!order || order.status !== 'delivered' || !requestProblem?.request) return 'none'
-    if (code !== requestProblem.answer) return 'wrong'
-    setShopOpen(false)
+    // 答えは、注文した商品のアイテム番号を桁ごとに足したもの
+    if (code !== sockKeyOfItems(order.items, products)) return 'wrong'
+    // Santazon は開いたまま。エルフが話してから、フェードでゲーム画面へ（BingoGame の onFadeToGame）
     onSolved()
     return 'ok'
   }
 
-  const sockCode = (() => {
-    const order = doc.order
-    if (!order) return undefined
-    if (lastProblem) return lastProblem.code
-    const first = products.find((p) => p.id === order.items[0]?.id)
-    if (first) return PROBLEMS[first.category].code
-    if (isGame1LoseCart(order.items)) return PROBLEMS.game1.code
-    return undefined
-  })()
+  // 宅配ソックスの番号（大人部屋に出す）。注文した商品のアイテム番号を、桁ごとに足したもの
+  const sockCode = doc.order ? sockKeyOfItems(doc.order.items, products) : undefined
+  // デバッグモード（?debug=true）：ソックスキーの答えを、画面の上に出す
+  const debugMode = new URLSearchParams(location.search).get('debug') === 'true'
+  const debugKey =
+    lastStep === 'basket'
+      ? `ソックスキー（ルドリー）取り出し依頼 ${LAST_REQUEST_CODE}`
+      : doc.order
+        ? `ソックスキー ${sockCode}`
+        : cart.length
+          ? `ソックスキー（カートの中身なら）${sockKeyOfItems(cart, products)}`
+          : null
   const proceedAt = localProceedAt ?? doc.order?.proceedAt
   const stayed = !!doc.order?.stayed
   const showGuide =
@@ -222,10 +237,16 @@ export default function PlayerScreen({ team }: { team: number }) {
     setLocalProceedAt(null)
     const stage = stageRef.current
     // ステージ3は、部屋から戻ったあとにクリアの会話がある
-    if (stage === WORD_STAGE) update({ phase: 'clear' })
-    else if (stage >= GAME_COUNT) update({ phase: 'end' })
-    else update({ stage: stage + 1, phase: 'novel' })
+    if (stage === WORD_STAGE && doc.phase !== 'clear') update({ phase: 'clear' })
+    // ステージが切り替わるときは、暗くしてから切り替えて、フェードインで戻す
+    else if (stage >= GAME_COUNT) fadeThen(() => update({ phase: 'end' }))
+    else fadeThen(() => update({ stage: stage + 1, phase: 'novel' }))
   }
+
+  // ステージや場面が切り替わったら、「次に進む」の二重タップ防止を戻す（戻さないと、ステージ2のクリア後にタップしても進まない）
+  useEffect(() => {
+    advancing.current = false
+  }, [doc.stage, doc.phase])
 
   // 正しい注文（ステージ1は王冠・タンバリン・フラフープ、ステージ3はペンギン・ダチョウ）は、数秒後に自動で届ける
   useEffect(() => {
@@ -248,14 +269,11 @@ export default function PlayerScreen({ team }: { team: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chairNow])
 
-  // LAST：エントツとボールを入れて待ち時間が終わったら、タップを待たずに【重要】の通知へ
-  const ballsDone = adultReady && lastStep === 'balls'
-  useEffect(() => {
-    if (!ballsDone) return
+  // LAST：エントツとボールを発送して1分たったら、「タップで次に進む」を出す。タップすると警告マークの通知へ
+  const toNotice = () => {
     setLocalProceedAt(null)
     update({ last: { ...DEFAULT_LAST, ...doc.last, step: 'notice' } })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ballsDone])
+  }
 
   useEffect(() => {
     if (!adultWait || proceedAt == null) return
@@ -383,7 +401,7 @@ export default function PlayerScreen({ team }: { team: number }) {
           doc={doc}
           update={update}
           shopOpen={shopOpen}
-          // 【重要】の通知から、フェードでマスターエルフの会話へ
+          // 警告マークの通知から、フェードでマスターエルフの会話へ
           onNotice={() => fadeThen(() => update({ phase: 'clear', last: { ...DEFAULT_LAST, ...doc.last, step: 'super' } }))}
         />
       )
@@ -394,8 +412,29 @@ export default function PlayerScreen({ team }: { team: number }) {
           doc={doc}
           update={update}
           shopOpen={shopOpen}
+          // 取り出し依頼が通ったあと：暗くして Santazon を閉じ、ゲーム画面へ
+          onFadeToGame={(then) =>
+            fadeThen(() => {
+              setShopOpen(false)
+              then()
+            })
+          }
+          onRequestGlow={setRequestGlow}
+          // 「アイテムが届きました」を閉じたあと、ROUND1 の取り出し依頼の説明が始まる
+          arrived={arrivedSeenAt === (doc.order?.at ?? null)}
+          onLock={setBingoLock}
           onDone={() =>
-            fadeThen(() => update({ stage: doc.stage + 1, phase: 'novel', order: null, bingo: { ...DEFAULT_BINGO, ...doc.bingo, step: 'done' } }))
+            fadeThen(() => {
+              // LAST の最初には、サッカーボールがリストに載っている（ROUND2 で1つ発送済みなので、在庫は 4/5）
+              const ballId = products.find((p) => p.name.replace(/\s/g, '').startsWith('サッカーボール'))?.id
+              update({
+                stage: doc.stage + 1,
+                phase: 'novel',
+                order: null,
+                bingo: { ...DEFAULT_BINGO, ...doc.bingo, step: 'done' },
+                searched: ballId ? [...new Set([...doc.searched, ballId])] : doc.searched,
+              })
+            })
           }
         />
       )
@@ -418,17 +457,18 @@ export default function PlayerScreen({ team }: { team: number }) {
         scene={edited ?? CLEAR[doc.stage - 1]}
         onFinish={() => {
           if (doc.stage === 1) update({ phase: 'game', markCleared: true })
-          if (doc.stage === HIDE_STAGE) setClearNext(doc.stage)
+          // ステージ2・3は、会話のあとに「タップで次のステージに進む」を出す
+          if (doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE) setClearNext(doc.stage)
           // LAST：マスターエルフの話のあと、ルドリーのための注文に戻る
           if (doc.stage === LAST_STAGE) update({ phase: 'game' })
         }}
         endButton={
-          doc.stage === 1 || doc.stage === HIDE_STAGE || doc.stage === LAST_STAGE
+          doc.stage === 1 || doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE || doc.stage === LAST_STAGE
             ? undefined
             : {
                 label: '次に進む',
                 onClick: () =>
-                  doc.stage >= GAME_COUNT ? update({ phase: 'end' }) : update({ stage: doc.stage + 1, phase: 'novel' }),
+                  fadeThen(() => (doc.stage >= GAME_COUNT ? update({ phase: 'end' }) : update({ stage: doc.stage + 1, phase: 'novel' }))),
               }
         }
       />
@@ -448,9 +488,17 @@ export default function PlayerScreen({ team }: { team: number }) {
     (doc.stage === WORD_STAGE && doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'room') ||
     // ステージ4は、ラウンド中で山札がそろう前だけ
     (doc.stage === BINGO_STAGE && doc.phase === 'game' && (!bingoRound || !!doc.bingo?.deckIn)) ||
-    // LAST は、取り出したあとの会話と【重要】の通知のあいだは注文できない
+    // LAST は、取り出したあとの会話と警告マークの通知のあいだは注文できない
     (lastStep != null && doc.phase === 'game' && (lastStep === 'extract' || lastStep === 'notice'))
   const records = (doc.records ?? []).filter((id) => RECORDS[id])
+  // ステージ4 ROUND1 で発送したアイテムと、ソックスキー（ROUND2 の「番号の法則」のナゾの手がかり）
+  const r1Record = (() => {
+    const items = (ROUNDS.r1.order ?? []).flatMap((w) => {
+      const p = products.find((x) => x.name.replace(/\s/g, '').startsWith(w))
+      return p ? [{ id: p.id, qty: 1, name: p.name, code: p.code }] : []
+    })
+    return [...items.map((i) => `${i.name}（アイテム番号 ${i.code}）`), `ソックスキー ${sockKeyOfItems(items, products)}`]
+  })()
   // 「やるべきこと」：そのステージでやること と、子どものキモチ（ハートの代わり）
   const task: { text?: string; mood?: Mood } = (() => {
     if (doc.phase !== 'game') return {}
@@ -465,20 +513,62 @@ export default function PlayerScreen({ team }: { team: number }) {
   const canOrder = !markQuiz || guideWait === 'shop'
   const delivered = doc.order?.status === 'delivered'
   const orderAt = doc.order?.at ?? null
+
+  // LAST の最後：ルドリーのための正しい注文が届いて、「アイテムが届きました」を閉じたら、フェードでエンディングへ（ナゾは出ない）
+  const finalArrived = lastStep === 'super' && doc.phase === 'game' && delivered && !!doc.order && arrivedSeenAt === (doc.order.at ?? null)
+  const finalGoing = useRef(false)
+  useEffect(() => {
+    if (!finalArrived) finalGoing.current = false
+  }, [finalArrived])
+  useEffect(() => {
+    if (!finalArrived || finalGoing.current) return
+    finalGoing.current = true
+    fadeThen(() => {
+      setShopOpen(false)
+      setCart([])
+      update({ phase: 'end', order: null })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finalArrived])
   // 注文が変わったら、ナゾは閉じた状態から
   useEffect(() => setProblemOpen(false), [orderAt])
   const openProblem = () => {
     if (!delivered) return
     setShopOpen(false)
     setArrivedSeenAt(orderAt)
+    setSockPressedAt(orderAt)
+    setProblemOpen(true)
+  }
+  // Santazon の中から押したとき（ステージ4〜）は、Santazon を閉じず、その上にナゾを重ねて開く（ゲーム画面に切り替えない）
+  const openProblemOverShop = () => {
+    if (!delivered) return
+    setArrivedSeenAt(orderAt)
+    setSockPressedAt(orderAt)
     setProblemOpen(true)
   }
   // ステージ1：マークが分かったあとの説明（マークの画面のまま）
   const rulesGuide = loaded && entered && doc.stage === 1 && doc.phase === 'game' && !!doc.markSolved && !doc.markCleared && !blackout
   // ステージ1：正しい注文が届いたあとの、ソックスキーの説明
-  const sockGuide =
+  // 1stの注文は、すぐにソックスキーの説明が入るので、「アイテムが届きました」の演出は出さない
+  // （説明のあとで再読み込みしても、もう一度は流さない）
+  const skipArrival = doc.stage === 1 && doc.phase === 'game' && delivered && !!doc.order && correctCart(doc.order.items)
+  const sockReady =
     loaded && entered && doc.stage === 1 && doc.phase === 'game' && !!doc.markCleared && !doc.sockTold &&
-    delivered && !!doc.order && correctCart(doc.order.items) && arrivedSeenAt === orderAt
+    delivered && !!doc.order && correctCart(doc.order.items) && (arrivedSeenAt === orderAt || skipArrival)
+  // 「注文が確定しました」の閉じるを押した瞬間に、暗くして santazon を閉じ、届いたら説明を始める（フェード）
+  const [sockFadedAt, setSockFadedAt] = useState<number | null>(null)
+  const sockGuide = sockReady && sockFadedAt === orderAt && !blackout
+  const onConfirmedClose = () => {
+    if (doc.stage !== 1 || doc.phase !== 'game' || doc.sockTold || !doc.order || !correctCart(doc.order.items) || sockFadedAt === orderAt) return
+    fadeThen(() => {
+      setShopOpen(false)
+      setSockFadedAt(orderAt)
+    })
+  }
+  // 再読み込みなどで santazon が開いていないときは、押す場面がないので、そのまま始める
+  useEffect(() => {
+    if (sockReady && !shopOpen && !blackout && sockFadedAt !== orderAt) setSockFadedAt(orderAt)
+  }, [sockReady, shopOpen, blackout, sockFadedAt, orderAt])
   useEffect(() => {
     if (sockGuide) setShopOpen(false)
   }, [sockGuide])
@@ -490,8 +580,8 @@ export default function PlayerScreen({ team }: { team: number }) {
       setShopOpen(true)
     } else openProblem()
   }
-  // ソックスキーを導くボタンは、注文できる場面で出す（届くまでは灰色）
-  const showSockKey = !markQuiz && doc.phase === 'game' && !shopOpen
+  // 「アイテムが届きました」のあと、ナゾを開くまで：Santazon のボタン（と、それを開く下のボタン）を光らせる
+  const sockGlow = doc.stage >= 2 && !markQuiz && delivered && arrivedSeenAt === orderAt && sockPressedAt !== orderAt
   // 会話中に開いたままの画面は閉じる。テキストを送る以外の操作を残さない
   useEffect(() => {
     if (!talking && !markQuiz) return
@@ -503,6 +593,7 @@ export default function PlayerScreen({ team }: { team: number }) {
   }, [talking, markQuiz])
   return (
     <div className="screen player">
+      {debugMode && debugKey && <div className="debug-sockkey">{debugKey}</div>}
       {framed ? (
         <>
           <div className="play-area">
@@ -520,15 +611,19 @@ export default function PlayerScreen({ team }: { team: number }) {
                 // 取り出し依頼ボタンはステージ4から、ずっと出す
                 onRequest={doc.stage >= BINGO_STAGE ? onRequest : undefined}
                 // 届いた注文のナゾ（閉じていても、ここから開き直せる）
-                onOpenProblem={openProblem}
+                onOpenProblem={doc.stage >= BINGO_STAGE ? openProblemOverShop : openProblem}
+                sockGlow={sockGlow}
+                requestGlow={requestGlow}
+                onConfirmedClose={onConfirmedClose}
                 guide={doc.phase === 'game' && doc.stage === HIDE_STAGE ? guide.sz : null}
               />
             )}
           </div>
           {/* 最後（エンディング・エクストラゲーム）は、下のボタンを出さない */}
-          {doc.phase !== 'end' && <GameMenu
+          {/* 最後は出さない。ステージ3のゲーム中（部屋のお題が出るまで）も、ゲーム画面を大きく見せるために出さない */}
+          {doc.phase !== 'end' && !(doc.stage === WORD_STAGE && doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'room') && <GameMenu
             shopOpen={shopOpen}
-            locked={talking}
+            locked={talking || (doc.stage === BINGO_STAGE && bingoLock)}
             onOrder={
               !canOrder
                 ? undefined
@@ -539,25 +634,17 @@ export default function PlayerScreen({ team }: { team: number }) {
             }
             onTask={task.text || task.mood ? () => setTaskOpen(true) : undefined}
             onRecord={records.length ? () => setRecordsOpen(true) : undefined}
-            guide={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && guide.menu) ? '注文' : null}
+            guide={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && guide.menu) || (sockGlow && !shopOpen && !talking) ? '注文' : null}
             guided={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && (guide.menu || !!guide.sz))}
           />}
-          {showSockKey && !talking && (
-            <button className="sock-key-btn" disabled={!delivered} onClick={openProblem}>
-              <svg viewBox="0 0 64 80" aria-hidden>
-                <path fill="currentColor" d="M16 24h30v24c0 1 1 4 6 6 7 3 10 8 7 14-3 6-12 8-20 5L22 65c-8-4-12-11-10-18l4-8V24z" />
-                <rect x="12" y="6" width="38" height="20" rx="6" fill="#fff" stroke="currentColor" strokeWidth="4" />
-              </svg>
-              <span>ソックスキーを導く</span>
-            </button>
-          )}
-          {!talking && delivered && doc.order && arrivedSeenAt !== orderAt && (
+          {!talking && delivered && doc.order && arrivedSeenAt !== orderAt && !skipArrival && (
             <ArrivalNotice onClose={() => setArrivedSeenAt(orderAt)} />
           )}
           {!talking && delivered && doc.order && problemOpen && (
             <ProblemDialog
               order={doc.order}
               problem={bingoRound ? ROUNDS[bingoRound].problem : lastProblem}
+              hint={bingoRound === 'r2' && records.includes('st4-r1') ? R2_HINT : undefined}
               onSolved={onSolved}
               onClose={() => setProblemOpen(false)}
             />
@@ -588,6 +675,13 @@ export default function PlayerScreen({ team }: { team: number }) {
               sockOpen={problemOpen}
               onWait={setGuideWait}
               onReopen={reopenForGuide}
+              // 「画面右下の…」の台詞で、自動で Santazon の画面に移る
+              onOpenShop={() =>
+                fadeThen(() => {
+                  setSzTab('list')
+                  setShopOpen(true)
+                })
+              }
               onDone={() => update({ sockTold: true })}
             />
           )}
@@ -597,15 +691,22 @@ export default function PlayerScreen({ team }: { team: number }) {
                 <img src={characterImage('Common', '真顔')} alt="" />
                 <p className="is-three">
                   <span>エルフ</span>
-                  {/* LAST のルドリーのための注文は、大人部屋にはもう入れない */}
-                  <em>{lastStep === 'super' ? <>【<b>行動シート</b>】に記入してください。</> : <>【<b>行動シート</b>】に記入して、大人部屋に向かいましょう。</>}</em>
-                  <em>宅配ソックスの番号は「<b>{sockCode}</b>」です。</em>
+                  {lastStep === 'balls' ? (
+                    // LAST：エントツとボールの発送のあとの会話（セリフ編集の「エントツとボールを発送したあと」）
+                    ballsLines.map((l, i) => <em key={i}>{hl(l.text)}</em>)
+                  ) : (
+                    <>
+                      {/* LAST のルドリーのための注文は、大人部屋にはもう入れない */}
+                      <em>{lastStep === 'super' ? <>【<b>行動シート</b>】に記入してください。</> : <>【<b>行動シート</b>】に記入して、大人部屋に向かいましょう。</>}</em>
+                      <em>宅配ソックスの番号は「<b>{sockCode}</b>」です。</em>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
           )}
-          {!talking && adultReady && !chair && lastStep !== 'balls' && (
-            <div className="stage-next" onClick={goNext}>
+          {!talking && adultReady && !chair && (
+            <div className="stage-next" onClick={lastStep === 'balls' ? toNotice : goNext}>
               <div className="stage-next-row">
                 <i>▼</i>
                 <span>タップで次のステージに進む</span>
@@ -627,12 +728,21 @@ export default function PlayerScreen({ team }: { team: number }) {
               <div className="modal records" onClick={(e) => e.stopPropagation()}>
                 <h2>記録</h2>
                 <div className="records-list">
-                  {records.map((id) => (
-                    <figure key={id}>
-                      <img src={RECORDS[id].image} alt="" />
-                      <figcaption>{RECORDS[id].title}</figcaption>
-                    </figure>
-                  ))}
+                  {records.map((id) =>
+                    id === 'st4-r1' ? (
+                      <figure key={id} className="records-text">
+                        <figcaption>{RECORDS[id].title}</figcaption>
+                        {r1Record.map((l, i) => (
+                          <p key={i}>{l}</p>
+                        ))}
+                      </figure>
+                    ) : (
+                      <figure key={id}>
+                        <img src={RECORDS[id].image} alt="" />
+                        <figcaption>{RECORDS[id].title}</figcaption>
+                      </figure>
+                    ),
+                  )}
                 </div>
                 <button onClick={() => setRecordsOpen(false)}>閉じる</button>
               </div>

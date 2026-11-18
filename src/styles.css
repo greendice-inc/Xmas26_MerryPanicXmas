@@ -289,7 +289,9 @@ button.keybox-tab.is-on { background: var(--charcoal); color: #fff; }
 .novel-bg.placeholder { background: linear-gradient(160deg, #e4e4e7, #cfcfd4); color: rgba(0, 0, 0, 0.2); }
 /* キャラクター：画面の真ん中に立つ。登場時は画面の下からせり上がる */
 .novel-char { position: absolute; bottom: 290px; width: 520px; height: 640px; animation: char-in .9s var(--lead, 0ms) cubic-bezier(.2, 1.15, .4, 1) both; }
-.novel-char.pos-center { left: 50%; margin-left: -260px; }
+.novel-char.pos-center { left: 50%; margin-left: -260px; transition: left .6s ease, margin-left .6s ease; }
+/* 画像を出しているあいだは、キャラを左へ（画像は右に出す） */
+.novel-char.pos-center.is-shifted { left: 140px; margin-left: 0; }
 .novel-char.pos-left { left: 140px; }
 .novel-char.pos-right { right: 140px; }
 .novel-char.is-silent .novel-char-body img { filter: brightness(.7); }
@@ -311,7 +313,8 @@ button.keybox-tab.is-on { background: var(--charcoal); color: #fff; }
   animation: panel-in .5s calc(var(--lead, 0ms) + .7s) cubic-bezier(.2, 1, .3, 1) both;
 }
 /* 吹き出しの左上：話している人の名前 */
-.novel-speaker { position: absolute; left: 40px; top: -26px; padding: 6px 30px; font-size: 36px; font-weight: 900; color: #fff; background: var(--charcoal); border-radius: 999px; }
+.novel-speaker { position: absolute; left: 16px; top: -30px; padding: 6px 30px; font-size: 36px; font-weight: 900; color: #fff; background: var(--charcoal); border-radius: 0; }
+.novel-speaker:empty { display: none; }
 .novel-text { position: relative; width: 100%; display: flex; flex-direction: column; gap: 24px; font-family: 'Line', sans-serif; }
 /* 最初から2行分の高さ。1行のときは上の行に置き、折り返しても先頭が動かない */
 .novel-text .text { white-space: pre-line; line-height: 1.5; font-weight: 900; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.12); height: 3em; }
@@ -341,7 +344,7 @@ button.keybox-tab.is-on { background: var(--charcoal); color: #fff; }
 /* 右下のボタンは、メニュー右端の「記録」ボタンの中央の上に並べる（右端からの距離） */
 .play-area { position: absolute; inset: 0; overflow: visible; --rec-c: calc(40px + (1840px - 56px) / 6); }
 /* 枠があったときの見た目の位置を保ったまま、背景だけ端まで出す */
-.play-area .novel-panel { left: 90px; right: 90px; bottom: 236px; }
+.play-area .novel-panel { left: 90px; right: 90px; bottom: 140px; }
 .play-area .novel-char { bottom: 490px; }
 /* 下のボタン（トップ２.webp）：580x120 を x=40 / 670 / 1300、y=1080〜1200（画面の下端につける） */
 .game-menu { position: absolute; left: 40px; right: 40px; bottom: 0; height: 120px; z-index: 6; display: flex; gap: 50px; }
@@ -542,8 +545,9 @@ button.mood-heart:active span { box-shadow: none; }
 .sz-dialog.sz-wide { width: 1200px; }
 .sz-elf-back { position: absolute; inset: 0; z-index: 50; cursor: pointer; background: rgba(15, 17, 17, 0.35); }
 .sz-elf-back.is-static { z-index: 60; cursor: default; }
-.sz-elf-line { position: absolute; left: 40px; right: 40px; bottom: 48px; display: flex; align-items: flex-end; gap: 24px; }
-.sz-elf-line img { width: 280px; height: 340px; flex: none; object-fit: contain; object-position: center bottom; }
+.sz-elf-line { position: absolute; left: 40px; right: 40px; bottom: 48px; display: flex; align-items: center; gap: 24px; }
+/* アイコンは、テキストボックスの縦のまんなかに合わせる（ボックスの下の余白 24px と同じ分、アイコンも持ち上げる） */
+.sz-elf-line img { width: 280px; height: 340px; flex: none; object-fit: contain; object-position: center bottom; margin-bottom: 24px; }
 .sz-elf-line p {
   position: relative; flex: 1; margin: 0 0 24px; min-height: 180px;
   display: flex; align-items: center; padding: 36px 48px;
@@ -552,9 +556,9 @@ button.mood-heart:active span { box-shadow: none; }
   animation: pop-in .35s ease both;
 }
 .sz-elf-line p span {
-  position: absolute; left: 36px; top: -26px; padding: 6px 30px;
+  position: absolute; left: 16px; top: -30px; padding: 6px 30px;
   font-family: 'Other', sans-serif; font-size: 36px; font-weight: 900; color: #fff;
-  background: var(--charcoal); border-radius: 999px;
+  background: var(--charcoal); border-radius: 0;
 }
 .sz-elf-line p em { font-style: normal; }
 .sz-elf-line p.is-three {
@@ -584,33 +588,33 @@ button.problem-arrive {
   padding: 0; border-radius: 0; background: transparent; box-shadow: none;
   font-family: 'Line', sans-serif; font-size: 84px; font-weight: 900; color: #fff;
 }
-/* サンタが靴下にプレゼントを入れる（全体で約2.6秒） */
-.arrive-scene { width: 920px; height: auto; margin-top: -80px; overflow: visible; }
+/* 真ん中にプレゼントが落ちてきて、はずみ、ふたが持ち上がって光る（全体で約2.4秒） */
+.arrive-scene { width: 760px; height: auto; margin-top: -80px; overflow: visible; }
 .arrive-scene g { transform-box: view-box; }
-.arrive-sock { transform-origin: 400px 0; animation: sock-drop .6s cubic-bezier(.3, 1.4, .5, 1) both, sock-catch .45s 1.75s ease-out; }
-.arrive-slide { animation: santa-in .75s .35s cubic-bezier(.2, 1.1, .4, 1) both, santa-out .6s 2.35s ease-in forwards; }
-.arrive-slide.is-gift { animation: santa-in .75s .35s cubic-bezier(.2, 1.1, .4, 1) both; }
-.arrive-santa { transform-origin: 612px 280px; animation: santa-hop .5s 1.1s ease-in-out 2; }
-.arrive-gift { animation: gift-drop .65s 1.2s cubic-bezier(.4, 0, .9, .6) forwards; }
-.arrive-sparkles .sp { transform-box: fill-box; transform-origin: center; opacity: 0; animation: sparkle-pop .8s 1.8s ease-out both; }
-.arrive-sparkles .sp:nth-child(2) { animation-delay: 1.9s; }
-.arrive-sparkles .sp:nth-child(3) { animation-delay: 2s; }
-.arrive-sparkles .sp:nth-child(4) { animation-delay: 2.1s; }
-.arrive-text { position: relative; margin-top: -40px; animation: arrive-text .5s 2.1s cubic-bezier(.2, 1.5, .4, 1) both; text-shadow: 0 6px 0 rgba(0, 0, 0, .25); }
-.arrive-hint { font-size: 36px; opacity: 0; animation: fade-in .4s 2.7s both, problem-blink 1.4s 3.1s linear infinite; }
-@keyframes sock-drop { from { transform: translateY(-560px); } to { transform: none; } }
-@keyframes sock-catch { 0% { transform: none; } 35% { transform: rotate(-6deg) scaleY(1.05); } 70% { transform: rotate(4deg); } 100% { transform: none; } }
-@keyframes santa-in { from { transform: translateX(560px); } to { transform: none; } }
-@keyframes santa-out { to { transform: translate(620px, -60px); opacity: 0; } }
-@keyframes santa-hop { 50% { transform: translateY(-14px) rotate(-3deg); } }
-@keyframes gift-drop {
-  0% { transform: none; }
-  35% { transform: translate(-70px, -40px) rotate(-14deg); }
-  90% { opacity: 1; }
-  100% { transform: translate(-90px, 230px) rotate(-4deg); opacity: 0; }
+.arrive-glow { transform-box: fill-box; transform-origin: center; opacity: .3; animation: arrive-glow-in .8s ease-out both, arrive-glow-burst .9s .9s ease-out both; }
+.arrive-shadow { transform-box: fill-box; transform-origin: center; animation: shadow-in .8s ease-in both; }
+.arrive-box { transform-origin: 400px 420px; animation: box-drop .85s cubic-bezier(.3, 0, .6, 1) both, box-squash .5s .85s ease-out, box-wiggle .9s 1.4s ease-in-out; }
+.arrive-sparkles .sp { transform-box: fill-box; transform-origin: center; opacity: 0; animation: sparkle-pop .8s .95s ease-out both; }
+.arrive-sparkles .sp:nth-child(2) { animation-delay: 1.05s; }
+.arrive-sparkles .sp:nth-child(3) { animation-delay: 1.15s; }
+.arrive-sparkles .sp:nth-child(4) { animation-delay: 1.25s; }
+.arrive-text {
+  position: relative; margin-top: -40px; padding: .1em .35em .2em; line-height: 1.25; white-space: nowrap;
+  color: transparent;
+  background: linear-gradient(100deg, transparent 40%, #ffe38a 50%, transparent 60%) 120% 0 / 250% 100% no-repeat, linear-gradient(#fff, #fff) 0 0 / 100% 100% no-repeat;
+  -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 6px 0 rgba(0, 0, 0, .3));
+  animation: arrive-text .6s 1.6s cubic-bezier(.2, 1.5, .4, 1) both, arrive-shine 1.1s 2.1s ease-in-out both;
 }
+.arrive-hint { font-size: 36px; opacity: 0; animation: fade-in .4s 2.3s both, problem-blink 1.4s 2.7s linear infinite; }
+@keyframes box-drop { 0% { transform: translateY(-620px) rotate(-8deg); opacity: 0; } 15% { opacity: 1; } 100% { transform: none; } }
+@keyframes box-squash { 0% { transform: none; } 30% { transform: scale(1.1, .88); } 60% { transform: scale(.96, 1.05) translateY(-14px); } 100% { transform: none; } }
+@keyframes box-wiggle { 0%, 100% { transform: none; } 20% { transform: rotate(-4deg) translateY(-8px); } 45% { transform: rotate(3.5deg) translateY(-4px); } 70% { transform: rotate(-1.5deg); } }
+@keyframes shadow-in { from { opacity: 0; transform: scale(.3); } to { opacity: .25; transform: none; } }
+@keyframes arrive-glow-in { from { opacity: 0; transform: scale(.6); } to { opacity: .3; transform: none; } }
+@keyframes arrive-glow-burst { 0% { opacity: .3; transform: scale(1); } 35% { opacity: 1; transform: scale(1.22); } 100% { opacity: .5; transform: scale(1.05); } }
 @keyframes sparkle-pop { 0% { opacity: 0; transform: scale(.2); } 40% { opacity: 1; transform: scale(1.2) rotate(20deg); } 100% { opacity: 0; transform: scale(.9) rotate(40deg); } }
 @keyframes arrive-text { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes arrive-shine { from { background-position: 120% 0, 0 0; } to { background-position: -20% 0, 0 0; } }
 button.problem-arrive:active { transform: none; box-shadow: none; }
 .sz-dialog-back.sz-top .sz-close { z-index: 2; }
 @keyframes problem-blink {
@@ -688,22 +692,20 @@ button.novel-next-btn { position: absolute; right: 40px; bottom: 24px; --edge: #
 
 /* ステージ1：マーク当て。ぼかしたキービジュアルを敷く */
 .mark-game { justify-content: flex-end; gap: 0; padding: 0 0 180px; overflow: hidden; background: var(--bg); }
-.mark-bg {
-  position: absolute; left: -24px; top: -24px; width: calc(100% + 48px); height: calc(100% + 48px); z-index: 0;
-  object-fit: cover; object-position: center top; filter: blur(8px); opacity: 0.45; pointer-events: none;
-}
+.mark-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; object-fit: cover; pointer-events: none; }
 .mark-body { position: relative; z-index: 1; flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 48px 48px 12px; }
 .mark-speak { position: relative; z-index: 1; flex: none; width: 100%; display: flex; align-items: center; gap: 24px; padding: 0 40px; }
 .mark-speak-icon { width: 240px; height: 240px; flex: none; object-fit: contain; object-position: center bottom; background: none; border: 0; }
 .mark-speak-box { flex: 1; min-height: 240px; display: flex; align-items: center; margin: 0; padding: 28px 44px; background: #fff; border: 4px solid var(--charcoal); border-radius: 20px; font-family: 'Line', sans-serif; font-size: 42px; font-weight: 900; line-height: 1.45; animation: pop-in .35s ease both; }
-.mark-grid { display: flex; flex-direction: row; justify-content: center; align-items: flex-end; gap: 24px; }
+.mark-grid { display: flex; flex-direction: row; justify-content: center; align-items: flex-end; gap: 28px; }
 .mark-slot { display: flex; flex-direction: column; align-items: center; }
-.mark-score { height: 76px; font-size: 64px; font-weight: 900; line-height: 76px; color: var(--red); }
-.mark-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 220px; height: 220px; padding: 0; font-size: 40px; color: var(--ink); background: #fff; border-radius: 24px; box-shadow: inset 0 0 0 4px #cfcfd4, 0 6px 0 #cfcfd4; }
-.mark-btn.is-selected { box-shadow: inset 0 0 0 8px var(--red), 0 6px 0 var(--red-dark); }
-.mark-btn.is-solved { background: #f7f7f8; }
-.mark-btn:disabled { opacity: 1; }
-.mark-symbol { font-size: 96px; line-height: 1; }
+.mark-score { height: 84px; font-size: 68px; font-weight: 900; line-height: 84px; color: #fff; text-shadow: 0 4px 0 rgba(0, 0, 0, .35); }
+.mark-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 250px; height: 250px; padding: 0; background: none; border-radius: 22px; box-shadow: 0 8px 0 rgba(0, 0, 0, .35); }
+.mark-btn:active { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.mark-img { width: 100%; height: 100%; display: block; border-radius: 22px; pointer-events: none; }
+.mark-btn.is-selected { box-shadow: 0 0 0 8px #ffd400, 0 0 36px 12px rgba(255, 212, 0, .6); }
+.mark-btn.is-solved { opacity: .5; box-shadow: none; }
+.mark-btn:disabled { opacity: .5; }
 .mark-pad { display: flex; flex-direction: column; align-items: stretch; gap: 14px; width: max-content; }
 .mark-input { height: 84px; display: flex; align-items: center; padding: 0 28px; background: #fff; border-radius: 20px; box-shadow: inset 0 0 0 4px var(--charcoal); font-size: 52px; font-weight: 900; line-height: 1; letter-spacing: .06em; }
 .mark-keypad { display: flex; flex-direction: row; align-items: center; gap: 16px; }
@@ -721,24 +723,10 @@ button.novel-next-btn { position: absolute; right: 40px; bottom: 24px; --edge: #
 /* ステージ1の子供部屋。特定が終わったあとに出す */
 .kids-room { position: absolute; inset: 0; }
 .kids-room-bg { width: 100%; height: 100%; object-fit: fill; display: block; }
-button.room-spot {
-  position: absolute; z-index: 2; width: 80px; height: 64px; padding: 0;
-  transform: translate(-50%, -100%);
-  background: transparent; color: transparent; box-shadow: none; border-radius: 0;
-}
-button.room-spot:active, button.room-spot:focus-visible { transform: translate(-50%, -100%); box-shadow: none; outline: none; }
-button.room-spot.is-debug { background: rgba(var(--red-rgb), .35); box-shadow: inset 0 0 0 4px var(--red); }
-button.room-spot.is-debug:active, button.room-spot.is-debug:focus-visible { box-shadow: inset 0 0 0 4px var(--red); outline: none; }
-.room-zoom-back {
-  position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
-  background: rgba(20, 20, 20, .55); animation: fade-in .2s ease both;
-}
-.room-zoom { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.room-zoom-view {
-  width: 1100px; height: 740px; overflow: hidden; background: #111; border-radius: 16px;
-  border: 6px solid #fff; box-shadow: 0 16px 40px rgba(0, 0, 0, .4);
-}
-.room-zoom-view img { display: block; max-width: none; }
+.kids-room-marks { position: absolute; left: 0; right: 0; bottom: 190px; margin: 0; padding: 0; list-style: none; display: flex; justify-content: center; gap: 28px; pointer-events: none; }
+.kids-room-marks li { display: flex; align-items: center; gap: 10px; padding: 6px 22px 6px 12px; border-radius: 0; background: rgba(15, 17, 17, 0.6); }
+.kids-room-marks img { width: 72px; height: 72px; object-fit: contain; display: block; }
+.kids-room-marks span { font-size: 56px; font-weight: 900; color: #fff; line-height: 1; }
 .task-text { margin: 0; font-size: 40px; font-weight: 900; line-height: 1.5; text-align: center; }
 
 /* ---------- 商品登録（ゲーム画面とは別の、普通にスクロールするページ） ---------- */
@@ -806,7 +794,7 @@ button.room-spot.is-debug:active, button.room-spot.is-debug:focus-visible { box-
 
 /* ---------- 会話：中央に出す画像・キモチ（複数人） ---------- */
 .novel-slide {
-  position: absolute; left: 50%; top: 40%; z-index: 3; width: 900px; max-height: 560px; object-fit: contain;
+  position: absolute; left: 1230px; top: 40%; z-index: 3; width: 900px; max-height: 560px; object-fit: contain;
   transform: translate(-50%, -50%); pointer-events: none;
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .3));
   animation: slide-in .8s ease both;
@@ -864,7 +852,7 @@ button.hide-area.is-debug span {
 @keyframes found-pop { from { transform: translate(-50%, -50%) scale(.2) rotate(-10deg); opacity: 0; } to { transform: translate(-50%, -50%) scale(1) rotate(-4deg); opacity: 1; } }
 .hide-seek .mood-heart.hide-heart { bottom: 210px; }
 button.hide-kid-icon {
-  position: absolute; right: 270px; bottom: 210px; z-index: 4; width: 156px; height: 156px; padding: 0;
+  position: absolute; right: 40px; bottom: 176px; z-index: 4; width: 120px; height: 120px; padding: 0;
   background: #fff; border-radius: 50%; overflow: hidden;
   box-shadow: inset 0 0 0 6px var(--charcoal), 0 6px 0 var(--charcoal);
   animation: pop-in .4s cubic-bezier(.2, 1.4, .4, 1) both;
@@ -898,10 +886,11 @@ button.hide-edit-btn {
   to { transform: translate(calc(-50% + var(--fx, 0px)), calc(-50% + var(--fy, 400px))) scale(.06) rotate(-20deg); opacity: 0; }
 }
 .hide-elf {
-  position: absolute; left: 70px; right: 70px; bottom: 236px; z-index: 74;
-  display: flex; align-items: flex-end; gap: 24px; pointer-events: none;
+  position: absolute; left: 70px; right: 70px; bottom: 124px; z-index: 74;
+  display: flex; align-items: center; gap: 24px; pointer-events: none;
 }
-.hide-elf img { width: 240px; height: 300px; flex: none; object-fit: contain; object-position: center bottom; }
+/* アイコンは、テキストボックスの縦のまんなかに合わせる（ボックスの下の余白 20px と同じ分、アイコンも持ち上げる） */
+.hide-elf img { width: 240px; height: 300px; flex: none; object-fit: contain; object-position: center bottom; margin-bottom: 20px; }
 .hide-elf p {
   position: relative; flex: 1; margin: 0 0 20px; min-height: 160px;
   display: flex; align-items: center; padding: 32px 90px 32px 48px;
@@ -911,14 +900,17 @@ button.hide-edit-btn {
   animation: pop-in .35s ease both;
 }
 .hide-elf p span, .hide-kid-line p span {
-  position: absolute; left: 36px; top: -26px; padding: 6px 30px;
+  position: absolute; left: 16px; top: -30px; padding: 6px 30px;
   font-family: 'Other', sans-serif; font-size: 34px; font-weight: 900; color: #fff;
-  background: var(--charcoal); border-radius: 999px;
+  background: var(--charcoal); border-radius: 0;
 }
+.hide-elf p span:empty, .hide-kid-line p span:empty, .sz-elf-line p span:empty { display: none; }
 .hide-elf p i, .hide-kid-line p i {
   position: absolute; right: 32px; bottom: 14px; font-style: normal; font-size: 36px; color: var(--charcoal);
   animation: bob .8s ease-in-out infinite;
 }
+/* 下のボタンを出していないときは、画面の一番下まで下げる */
+.hide-elf.is-low { bottom: 24px; }
 /* Santazon を開いている間は、パネルに重ならないよう低めに出す */
 .hide-elf.is-compact { left: 70px; right: 70px; bottom: 214px; }
 .hide-elf.is-compact img { width: 200px; height: 230px; }
@@ -1059,22 +1051,22 @@ button.hide-edit-btn {
 
 /* ---------- ステージ3：押さえてワード ---------- */
 .word-game { position: absolute; inset: 0; background: #fff; }
-.word-room { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 20px 40px 24px; background: #f4f4f4; }
-.word-head { flex: none; display: flex; align-items: center; justify-content: center; gap: 48px; min-height: 140px; }
+.word-room { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 12px 40px 16px; background: #f4f4f4; }
+.word-head { flex: none; display: flex; align-items: center; justify-content: center; gap: 36px; min-height: 100px; }
 .word-label {
-  padding: 10px 30px; font-size: 34px; font-weight: 900; color: #fff;
+  padding: 6px 24px; font-size: 28px; font-weight: 900; color: #fff;
   background: var(--charcoal); border-radius: 999px; white-space: nowrap;
 }
 .word-prompt {
-  display: flex; align-items: baseline; gap: 24px; padding: 14px 54px; min-width: 760px; justify-content: center;
-  background: #fff; border: 8px solid var(--charcoal); border-radius: 32px; box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+  display: flex; align-items: baseline; gap: 20px; padding: 6px 44px; min-width: 640px; justify-content: center;
+  background: #fff; border: 6px solid var(--charcoal); border-radius: 26px; box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
 }
-.word-prompt small { font-size: 34px; font-weight: 900; color: var(--ink-sub); white-space: nowrap; }
-.word-prompt b { font-family: 'Line', sans-serif; font-size: 76px; font-weight: 900; color: var(--ink); white-space: nowrap; letter-spacing: .08em; }
+.word-prompt small { font-size: 26px; font-weight: 900; color: var(--ink-sub); white-space: nowrap; }
+.word-prompt b { font-family: 'Line', sans-serif; font-size: 56px; font-weight: 900; color: var(--ink); white-space: nowrap; letter-spacing: .08em; }
 .word-progress { display: flex; gap: 16px; }
 .word-progress i { width: 40px; height: 40px; border-radius: 50%; background: #d6d6da; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .12); }
 .word-progress i.is-on { background: #ffb400; box-shadow: inset 0 -4px 0 #c98700, 0 0 0 4px rgba(255, 180, 0, .3); }
-.word-sub { flex: none; min-height: 52px; margin: 6px 0 10px; font-size: 32px; font-weight: 900; color: var(--ink); text-align: center; }
+.word-sub { flex: none; min-height: 36px; margin: 4px 0 6px; font-size: 26px; font-weight: 900; color: var(--ink); text-align: center; }
 .word-field { position: relative; flex: 1; min-height: 0; }
 .word-stage {
   position: absolute; top: 0; left: 50%; height: 100%; max-width: 100%;
@@ -1107,9 +1099,13 @@ button.hide-edit-btn {
   80% { opacity: 1; }
   100% { opacity: 0; }
 }
-.word-theme { display: flex; align-items: baseline; gap: 28px; padding: 14px 60px; font-size: 40px; font-weight: 900; color: var(--ink-sub); background: #fff; border: 8px solid var(--charcoal); border-radius: 32px; }
-.word-theme b { font-family: 'Line', sans-serif; font-size: 80px; color: var(--red); }
-.word-room > .word-head:has(.word-theme) { flex-direction: column; gap: 10px; min-height: 0; margin-bottom: 16px; }
+.word-theme { display: flex; align-items: baseline; gap: 28px; padding: 6px 44px; font-size: 30px; font-weight: 900; color: var(--ink-sub); background: #fff; border: 6px solid var(--charcoal); border-radius: 26px; }
+.word-theme.is-pop { animation: pop-in .35s ease both; }
+.word-theme b { font-family: 'Line', sans-serif; font-size: 56px; color: var(--red); }
+.word-room > .word-head:has(.word-theme) { flex-direction: column; gap: 4px; }
+.word-demo { display: flex; align-items: center; justify-content: center; gap: 36px; }
+/* お題・見本・ナゾの文字は出たり消えたりするので、上の帯はいつも同じ高さにして、背景をずらさない（お題の帯が一番高い） */
+.word-room > .word-head { height: 150px; min-height: 0; margin-bottom: 0; }
 .word-room > .word-head .word-sub { margin: 0; }
 .word-game .mood-heart.word-heart { bottom: 210px; }
 .word-clear { position: absolute; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: rgba(15, 17, 17, .45); pointer-events: none; animation: fade-in .25s ease both; }
@@ -1212,11 +1208,6 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
   background: #8a3c00 top center / cover no-repeat;
 }
 /* ラウンドの名前（左上。上の吹き出しにかからないところ） */
-.bingo-head { position: absolute; left: 24px; top: 44px; z-index: 3; pointer-events: none; }
-.bingo-label {
-  padding: 8px 22px; font-family: 'Line', sans-serif; font-size: 28px; font-weight: 900; color: #fff;
-  background: var(--charcoal); border-radius: 999px; box-shadow: 0 4px 0 #1c1c1f; white-space: nowrap;
-}
 /* 盤面：ビンゴ１.webp（1920×841）の座標でそのまま置く。背景 4th_back.webp に吹き出しが描いてある */
 .bingo-board { position: absolute; left: 0; top: 0; width: 1920px; height: 841px; }
 
@@ -1239,8 +1230,9 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-8deg); white-space: nowrap;
   font-family: 'Line', sans-serif; font-size: 120px; font-weight: 900; color: var(--red);
   -webkit-text-stroke: 12px #fff; paint-order: stroke fill; text-shadow: 0 10px 0 rgba(0, 0, 0, .18);
-  animation: bingo-win .7s .2s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none;
+  animation: bingo-win .7s .2s cubic-bezier(.2, 1.6, .4, 1) both, bingo-win-out .3s 2s ease forwards; pointer-events: none;
 }
+@keyframes bingo-win-out { to { opacity: 0; } }
 @keyframes bingo-win { from { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(-20deg); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg); } }
 
 /* 山札（card_1.webp 180×250）。大人は x=630、ロビンは x=1110 */
@@ -1260,14 +1252,14 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
 
 /* 吹き出しの中身：上がロビンの山札、下が大人の山札（250〜1670 の幅） */
 .bingo-deck-list {
-  position: absolute; left: 250px; width: 1420px; height: 140px; margin: 0; padding: 0 60px; box-sizing: border-box;
+  position: absolute; left: 250px; width: 1420px; height: 140px; margin: 0; padding: 0 100px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; white-space: nowrap;
   font-family: 'Line', sans-serif; font-size: 54px; font-weight: 900; letter-spacing: .04em;
 }
 .bingo-deck-list.is-kid { top: 35px; color: #9a6400; }
 .bingo-deck-list.is-adult { top: 685px; color: #0050c8; }
 .bingo-deck-list span { animation: fade-in .4s ease both; }
-.bingo-deck-list i { font-style: normal; margin: 0 .35em; }
+.bingo-deck-list i { font-style: normal; margin: 0 .25em; }
 /* 全部が？のときは、ビンゴ１.webp のように間を広くとる */
 .bingo-deck-list.is-all-q i { margin: 0 1.6em; }
 .bingo-deck-list span.is-used { opacity: .4; text-decoration: line-through; text-decoration-thickness: 5px; }
@@ -1278,7 +1270,7 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
 .bingo-face-bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .bingo-face {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  padding: 14px 10px; text-align: center; animation: bingo-flip .6s ease both;
+  padding: 14px 10px; text-align: center;
 }
 .bingo-face small { padding: 2px 14px; font-size: 20px; font-weight: 900; color: #fff; background: #0050c8; border-radius: 999px; }
 .bingo-face.is-kid small { background: #b07a00; }
@@ -1287,7 +1279,25 @@ button.catalog-link.script-link { --edge: #1c1c1f; background: var(--charcoal); 
 .bingo-face b.is-long { font-size: 21px; white-space: nowrap; letter-spacing: -.02em; }
 .bingo-face em { font-style: normal; font-family: 'Line', sans-serif; font-size: 60px; font-weight: 900; line-height: 1; color: #0050c8; }
 .bingo-face.is-kid em { color: #b07a00; }
-@keyframes bingo-flip { from { transform: rotateY(90deg) scale(.9); } to { transform: none; } }
+/* 山札から持ち上がり、くるっと裏返しながら真ん中に置かれる（--dx は、山札から真ん中までの横の距離） */
+/* めくったカードは真ん中に重ねて残す。最新の1枚は、山札から持ち上がり、くるっと裏返りながら置かれる。
+   横の移動・持ち上げ・回転を3つの入れ子に分けて、それぞれ別のなめらかな加減速をかける（1つにまとめるとかくつく） */
+.bingo-pile { position: absolute; inset: 0; transform: translate(var(--rx, 0), var(--ry, 0)) rotate(var(--rr, 0deg)); transform-style: preserve-3d; }
+.flip-x, .flip-y, .flip-rot { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
+.flip-x { animation: flip-x 1.2s cubic-bezier(.5, 0, .2, 1) both; }
+.flip-y { animation: flip-y 1.2s both; }
+.flip-rot { animation: flip-rot 1.2s cubic-bezier(.5, 0, .25, 1) both; }
+.bingo-flip-back, .bingo-flip-front { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.bingo-pile > .bingo-flip-front { backface-visibility: visible; }
+.bingo-flip-back { transform: rotateY(180deg); }
+.bingo-flip-back img { width: 100%; height: 100%; display: block; }
+@keyframes flip-x { from { transform: translateX(var(--dx)); } to { transform: none; } }
+@keyframes flip-y {
+  0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(.3, 0, .5, 1); }
+  45% { transform: translateY(-110px) scale(1.14); animation-timing-function: cubic-bezier(.5, 0, .6, 1); }
+  100% { transform: none; }
+}
+@keyframes flip-rot { from { transform: rotateY(180deg); } to { transform: rotateY(0deg); } }
 /* めくったカードの下（下の吹き出しのしっぽにかからない幅） */
 .bingo-action { position: absolute; left: 770px; top: 566px; width: 380px; height: 112px; display: flex; align-items: center; justify-content: center; z-index: 2; }
 button.bingo-flip-btn { font-size: 36px; padding: 18px 30px; white-space: nowrap; animation: guide-glow .7s ease-in-out infinite alternate; }
@@ -1330,27 +1340,27 @@ button.bingo-jack:active { transform: scale(.94); box-shadow: none; filter: brig
   background: #8a3c00 top center / 100% auto no-repeat;
 }
 .bingo-jack-view .bingo-board { transform: scale(.75); transform-origin: top left; }
-.bingo-jack-view .bingo-card, .bingo-jack-view .bingo-hole, .bingo-jack-view .bingo-face,
+.bingo-jack-view .bingo-card, .bingo-jack-view .bingo-hole, .bingo-jack-view .flip-x, .bingo-jack-view .flip-y, .bingo-jack-view .flip-rot,
 .bingo-jack-view .bingo-deck img, .bingo-jack-view .bingo-deck-list span, .bingo-jack-view .bingo-win { animation: none; }
 .bingo-jack-view .bingo-win { transform: translate(-50%, -50%) rotate(-8deg); }
 
 /* ---------- テンキー（ナゾの解答・取り出し依頼） ---------- */
-.tenkey { --key: 104px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
-.tenkey-slots { display: flex; gap: 14px; }
+.tenkey { --key: 112px; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+.tenkey-slots { display: flex; gap: 16px; }
 .tenkey-slots span {
   width: 92px; height: 112px; display: flex; align-items: center; justify-content: center;
   font-family: 'Line', sans-serif; font-size: 72px; font-weight: 900; color: var(--ink);
   background: #f4f4f5; border-bottom: 6px solid #c4c4cc; border-radius: 12px 12px 4px 4px;
 }
 .tenkey-slots span.is-cur { border-bottom-color: #1485e0; background: #eaf4fd; }
-.tenkey-pad { display: grid; grid-template-columns: repeat(3, var(--key)) calc(var(--key) * 1.3); grid-template-rows: repeat(4, var(--key)); gap: 12px; }
+.tenkey-pad { display: grid; grid-template-columns: repeat(3, var(--key)); grid-template-rows: repeat(4, var(--key)); gap: 14px; }
 button.tenkey-key {
   width: auto; height: auto; min-width: 0; padding: 0; font-family: 'Line', sans-serif; font-size: 48px; font-weight: 900; color: var(--ink);
   background: #fff; border-radius: 18px; box-shadow: inset 0 0 0 4px #cfcfd4, 0 5px 0 #cfcfd4;
 }
 button.tenkey-key:active { box-shadow: inset 0 0 0 4px #cfcfd4; transform: translateY(5px); }
 button.tenkey-key.is-side { font-size: 40px; color: var(--ink-sub); background: #f0f0f2; }
-button.tenkey-key.is-ok { font-size: 40px; color: #fff; background: #1485e0; box-shadow: 0 5px 0 #0c5ea3; }
+button.tenkey-key.is-ok { font-size: 34px; letter-spacing: .04em; color: #fff; background: #1485e0; box-shadow: 0 5px 0 #0c5ea3; }
 button.tenkey-key.is-ok:active { box-shadow: none; }
 button.tenkey-key.is-ok:disabled { opacity: .4; transform: none; }
 /* ナゾの画面：左に問題画像、右にテンキー */
@@ -1360,9 +1370,12 @@ button.tenkey-key.is-ok:disabled { opacity: .4; transform: none; }
 .problem-body .sz-problem-img.placeholder { width: 820px; height: 560px; }
 .problem-body.is-request { flex-direction: column; gap: 30px; }
 .problem-body.is-request .sz-problem-img { max-height: 560px; }
-.problem-request {
-  padding: 20px 50px; font-family: 'Line', sans-serif; font-size: 46px; font-weight: 900; color: #fff;
-  background: #e47911; border-radius: 999px; box-shadow: 0 6px 0 #a95a0c;
+/* 虫眼鏡ボタン（画像の右、72px＋間16px）がダイアログからはみ出さないよう、左右に同じ幅の余白をとって、画像は真ん中のまま */
+.problem-body.is-request .problem-center { padding: 0 92px; }
+.problem-request { white-space: pre-line;
+  /* ボタンに見えないよう、枠も影も塗りもなくして、左に線を引いた「指示」の文にする */
+  padding: 6px 0 6px 24px; font-family: 'Line', sans-serif; font-size: 42px; font-weight: 900; color: #c25e00;
+  border-left: 10px solid #e47911; background: none; border-radius: 0; box-shadow: none;
 }
 /* Santazon の取り出し依頼 */
 .santazon .sz-request { font-size: 28px; padding: 12px 30px; }
@@ -1396,7 +1409,7 @@ button.tenkey-key.is-ok:disabled { opacity: .4; transform: none; }
 .last-end-title { font-family: 'Line', sans-serif; font-size: 64px; font-weight: 900; color: #fff; -webkit-text-stroke: 10px var(--charcoal); paint-order: stroke fill; }
 button.last-extra-btn { font-size: 56px; padding: 30px 90px; animation: guide-glow .7s ease-in-out infinite alternate; }
 
-/* 【重要】の通知：ありえないくらい目立たせる */
+/* 警告マークの通知：ありえないくらい目立たせる */
 .last-notice-back { position: absolute; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center; background: rgba(60, 0, 8, .55); animation: fade-in .3s ease both; }
 button.last-notice {
   width: 1300px; padding: 60px 40px 54px; display: flex; flex-direction: column; align-items: center; gap: 22px;
@@ -1404,18 +1417,18 @@ button.last-notice {
   box-shadow: 0 0 0 10px #fff, 0 0 60px 20px rgba(255, 0, 30, .8);
   animation: last-alert .9s ease-in-out infinite alternate, pop-in .4s cubic-bezier(.2, 1.5, .4, 1) both;
 }
-.last-notice-tag { font-family: 'Line', sans-serif; font-size: 170px; font-weight: 900; line-height: 1; letter-spacing: .05em; color: #e00018; animation: last-blink .6s steps(2) infinite; }
+.last-notice-mark { width: 240px; height: auto; animation: last-blink .6s steps(2) infinite; }
 button.last-notice b { font-family: 'Line', sans-serif; font-size: 64px; font-weight: 900; color: #e00018; }
 button.last-notice small { font-size: 36px; color: var(--ink); }
 @keyframes last-alert { from { transform: scale(1) rotate(-1deg); } to { transform: scale(1.04) rotate(1deg); } }
 @keyframes last-blink { 50% { opacity: .35; } }
 
 /* ジャック機能：ルドリーの画面 */
-.last-kid-screen { width: 1450px; height: 640px; padding: 24px 36px; display: flex; flex-direction: column; gap: 16px; background: #fff; border: 6px solid var(--charcoal); border-radius: 24px; }
-.last-kid-screen.is-off { align-items: center; justify-content: center; background: #050507; color: #777; font-size: 44px; }
+.last-kid-screen { width: 1450px; height: 800px; padding: 24px 36px; display: flex; flex-direction: column; gap: 16px; background: #fff; border: 6px solid var(--charcoal); border-radius: 24px; }
+.last-kid-screen.is-off { width: 1306px; height: 816px; align-items: center; justify-content: center; background: #050507; color: #777; font-size: 44px; }
 .last-kid-title { font-size: 38px; font-weight: 900; color: var(--red); }
 .last-kid-body { flex: 1; display: flex; align-items: center; justify-content: center; gap: 80px; }
-.last-kid-body .sz-problem-img { max-height: 520px; max-width: 780px; }
+.last-kid-body .sz-problem-img { max-height: 600px; max-width: 780px; }
 .last-kid-body .sz-problem-img.placeholder { width: 760px; height: 480px; font-size: 36px; }
 .last-kid-pad { pointer-events: none; transform: scale(.85); }
 
@@ -1446,7 +1459,7 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .santazon .sz-cat { width: 160px; height: 90px; border-radius: 12px; }
 .santazon .sz-cat.is-wide { width: 490px; }
 /* 商品の行（item1.webp 1250×111） */
-.santazon .sz-list { position: absolute; left: 40px; top: 290px; width: 1250px; bottom: 40px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; overflow-x: hidden; }
+.santazon .sz-list { position: absolute; left: 40px; top: 290px; width: 1250px; bottom: 40px; scrollbar-width: none; touch-action: pan-y; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; overflow-x: hidden; }
 .sz-item { position: relative; flex: none; width: 1250px; height: 111px; background: center / 100% 100% no-repeat; }
 .sz-item-name { position: absolute; left: 30px; top: 0; bottom: 0; width: 800px; display: flex; align-items: center; gap: 26px; overflow: hidden; white-space: nowrap; }
 .sz-item-name b { font-size: 60px; font-weight: 900; color: #4b14b4; overflow: hidden; text-overflow: ellipsis; }
@@ -1480,6 +1493,20 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .santazon .sz-slot { width: 155px; height: 155px; border: 0; border-radius: 22px; background: center / 100% 100% no-repeat; font-size: 90px; color: #fff; }
 .santazon .sz-slot.is-char { color: #fff; }
 .santazon .sz-dash { color: #b28cff; font-size: 60px; }
+/* ソックスキーのナゾに正解したときの「正解！」（このあと次へ進む） */
+.problem-correct { position: absolute; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(15, 17, 17, .45); animation: fade-in .2s ease both; }
+.problem-correct span {
+  font-family: 'Line', sans-serif; font-size: 260px; font-weight: 900; color: #ff3b30; white-space: nowrap;
+  -webkit-text-stroke: 24px #fff; paint-order: stroke fill; text-shadow: 0 16px 0 rgba(0, 0, 0, .22);
+  animation: problem-correct-pop .6s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+@keyframes problem-correct-pop { from { opacity: 0; transform: scale(.2) rotate(-14deg); } to { opacity: 1; transform: scale(1) rotate(-4deg); } }
+/* ダイアログの「閉じる」：「注文する」（cart1.webp）と同じ、黄色に橙の文字、下に濃い縁 */
+.santazon .sz-dialog > .sz-btn {
+  font-family: 'Line', sans-serif; font-size: 40px; font-weight: 900; letter-spacing: .12em; padding: 18px 90px; margin-top: 10px; border-radius: 16px;
+}
+.santazon .sz-dialog > .sz-btn.sz-yellow { background: #ffe000; color: #f05a00; box-shadow: 0 8px 0 #d9b400; }
+.santazon .sz-dialog > .sz-btn.sz-yellow:active { transform: translateY(6px); box-shadow: 0 2px 0 #d9b400; filter: none; }
 .santazon .sz-search-actions .sz-btn { font-size: 40px; padding: 18px 70px; font-weight: 900; }
 .santazon .sz-search-actions .sz-yellow { background: #ffe000; color: #f05a00; box-shadow: 0 8px 0 #d9b400; }
 .santazon .sz-search-actions .sz-yellow:disabled { background: #e4e4e4; color: #aaa; box-shadow: 0 8px 0 #c8c8c8; }
@@ -1493,20 +1520,19 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .santazon button.sz-hint-ch { color: #ff8a1f; }
 .santazon .sz-result-back { border-radius: 0; }
 /* 案内中（ステージ2）は、目立たせたところ以外は触れない */
-.santazon.is-guided .sz-cat, .santazon.is-guided .sz-item-btn, .santazon.is-guided .sz-panel, .santazon.is-guided .sz-hint-ch { pointer-events: none; }
-
-/* ---------- ソックスキーを導く（ゲーム画面。右端：記録ボタンの右端にそろえる） ---------- */
-button.sock-key-btn {
-  position: absolute; right: 40px; bottom: 210px; z-index: 5;
-  width: 210px; height: 156px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-  font-size: 21px; font-weight: 900; color: #4b14b4; background: #fff; border-radius: 24px;
-  box-shadow: inset 0 0 0 5px #4b14b4, 0 8px 0 #4b14b4;
+.santazon.is-guided.is-drag2 .sz-slot, .santazon.is-guided .sz-panel.is-guide { pointer-events: auto; }
+.santazon .sz-search-actions button.is-guide { animation: guide-glow .7s ease-in-out infinite alternate; }
+/* 「2」から枠へ、ドラッグするように矢印が動く（先が「2」の中心から、空いている枠の中心へ） */
+.sz-drag-arrow { position: absolute; z-index: 72; width: 120px; height: 150px; overflow: visible; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); animation: sz-drag-move 1.8s ease-in-out infinite; }
+@keyframes sz-drag-move {
+  0% { transform: translate(0, 0); opacity: 0; }
+  12% { transform: translate(0, 0); opacity: 1; }
+  70% { transform: translate(var(--dx), var(--dy)); opacity: 1; }
+  88% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+  100% { transform: translate(0, 0); opacity: 0; }
 }
-button.sock-key-btn svg { width: 64px; height: 80px; color: #d62839; }
-button.sock-key-btn span { padding: 0; color: inherit; background: none; box-shadow: none; white-space: nowrap; }
-button.sock-key-btn:active { transform: translateY(6px); box-shadow: inset 0 0 0 5px #4b14b4; }
-button.sock-key-btn:disabled { color: #9a9aa6; background: #e4e4e8; box-shadow: inset 0 0 0 5px #b4b4bc, 0 8px 0 #b4b4bc; }
-button.sock-key-btn:disabled svg { color: #b4b4bc; }
+.santazon.is-guided .sz-cat, .santazon.is-guided .sz-item-btn, .santazon.is-guided .sz-panel, .santazon.is-guided .sz-hint-ch { pointer-events: none; }
+.santazon.is-guided.is-drag2 .sz-slot, .santazon.is-guided .sz-panel.is-guide { pointer-events: auto; }
 
 /* ---------- 案内：周りを暗くして、そこだけ明るく ---------- */
 .spot-dim { position: absolute; z-index: 71; background: rgba(8, 8, 14, .6); animation: fade-in .3s ease both; }
@@ -1516,12 +1542,21 @@ button.sock-key-btn:disabled svg { color: #b4b4bc; }
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45));
   animation: fade-in .3s ease both, guide-arrow-bob .6s ease-in-out infinite alternate;
 }
+.guide-arrow.is-up { animation: fade-in .3s ease both, guide-arrow-bob-up .6s ease-in-out infinite alternate; }
+.guide-arrow.is-up path { transform-origin: 60px 75px; transform: rotate(180deg); }
+@keyframes guide-arrow-bob-up { from { transform: translateY(22px); } to { transform: translateY(0); } }
 @keyframes guide-arrow-bob { from { transform: translateY(-22px); } to { transform: translateY(0); } }
 .spot-ring { position: absolute; z-index: 71; pointer-events: none; border-radius: 20px; box-shadow: 0 0 0 6px #ffd400, 0 0 30px 10px rgba(255, 212, 0, .6); animation: guide-glow .7s ease-in-out infinite alternate; }
 .guide-talk p { white-space: pre-line; }
 .guide-talk p .hl, .hide-elf p .hl { color: var(--red); font-weight: 900; }
-.hide-elf.guide-talk.is-top { top: 40px; bottom: auto; align-items: flex-start; }
+.hide-elf.guide-talk.is-top { top: 40px; bottom: auto; }
 .hide-elf.guide-talk.is-top img { height: 220px; }
+/* 右上に小さく：ナゾの画面（上端 y=237）の上に収まる大きさ */
+.hide-elf.guide-talk.is-corner { top: 36px; bottom: auto; left: auto; right: 40px; width: 1040px; gap: 16px; }
+.hide-elf.guide-talk.is-corner img { width: 150px; height: 190px; }
+.hide-elf.guide-talk.is-corner p { height: calc(1.45em * 3 + 36px); font-size: 32px; padding: 18px 64px 18px 32px; }
+.hide-elf.guide-talk.is-corner p span { font-size: 26px; padding: 4px 22px; top: -24px; }
+.hide-elf.guide-talk.is-corner p i { font-size: 28px; bottom: 8px; right: 24px; }
 .hide-elf.guide-talk.is-shop { left: 40px; right: 600px; bottom: 30px; }
 .hide-elf.guide-talk.is-shop img { width: 180px; height: 220px; }
 .hide-elf.guide-talk.is-shop p { font-size: 38px; padding: 26px 50px 26px 36px; }
@@ -1536,16 +1571,12 @@ button.sock-key-btn:disabled svg { color: #b4b4bc; }
 .mark-speak-box.is-more::after { content: '▼'; margin-left: auto; padding-left: 20px; font-size: 32px; animation: bob .8s ease-in-out infinite; }
 
 /* ---------- ステージ1：拡大できる場所（エリア編集で動かせる） ---------- */
-button.room-area { position: absolute; z-index: 2; padding: 0; background: transparent; box-shadow: none; border-radius: 12px; }
-button.room-area:active { transform: none; box-shadow: none; background: rgba(255, 255, 255, .15); }
-button.room-area.is-debug { background: rgba(var(--red-rgb), .18); box-shadow: inset 0 0 0 4px var(--red); }
-button.room-area.is-debug span { position: absolute; left: 6px; top: 6px; padding: 2px 10px; font-size: 22px; color: #fff; background: var(--red); border-radius: 8px; }
 
 /* ---------- セリフのテキストボックス：すべて3行ぶんの高さで固定。短いときは一番上の行から ---------- */
 /* 会話パート（NovelPart）：50px × 行の高さ1.5 × 3行 */
 .novel-panel { height: 305px; align-items: flex-start; padding-top: 40px; padding-bottom: 40px; }
 .novel-text .text { height: 4.5em; overflow: hidden; }
-.play-area .novel-char { bottom: 520px; }
+.play-area .novel-char { bottom: 424px; }
 /* ゲーム画面の上に出る会話（ステージ2〜4・LAST・ステージ1の案内） */
 .hide-elf p { height: calc(1.45em * 3 + 64px); min-height: 0; align-items: flex-start; }
 .hide-elf.is-compact p, .hide-elf.guide-talk.is-shop p { height: calc(1.45em * 3 + 56px); }
@@ -1614,8 +1645,94 @@ button.room-area.is-debug span { position: absolute; left: 6px; top: 6px; paddin
 .hide-corner-hint p::after { content: ''; position: absolute; right: -14px; top: 26px; border: 8px solid transparent; border-left: 10px solid var(--charcoal); }
 .hide-corner-hint p .hl { color: var(--red); }
 
+/* ステージ2：マネキンを検索してもらうあいだ、右上に出しておくダイアログ（Santazon の上） */
+.hide-search-dialog {
+  position: absolute; right: 40px; top: 36px; z-index: 74; max-width: 880px; padding: 18px 32px; pointer-events: none; white-space: pre-line;
+  font-family: 'Line', sans-serif; font-size: 32px; font-weight: 900; line-height: 1.45; color: var(--ink);
+  background: #fff; border: 4px solid var(--charcoal); border-radius: 18px; box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
+  animation: pop-in .3s ease both;
+}
+
 /* ステージ2：アミーのアイコンの下の説明 */
 .hide-kid-label {
-  position: absolute; right: 248px; width: 200px; bottom: 172px; z-index: 4; text-align: center; pointer-events: none;
+  position: absolute; right: 0; width: 200px; bottom: 140px; z-index: 4; text-align: center; pointer-events: none;
   font-size: 20px; font-weight: 900; color: var(--ink); text-shadow: 0 0 4px #fff, 0 0 4px #fff;
 }
+
+/* ?debug=true の隠しメニュー（左上の角。ふだんは見えない） */
+.debug-hidden { position: absolute; left: 0; top: 0; z-index: 8; }
+.debug-hidden-tap { display: block; width: 70px; height: 70px; padding: 0; background: transparent; box-shadow: none; border: 0; opacity: 0; }
+.debug-hidden-menu { display: flex; flex-direction: column; gap: 10px; margin: 0 0 0 16px; }
+.debug-hidden-menu button { padding: 10px 26px; font-size: 26px; --edge: #1c1c1f; background: var(--charcoal); }
+.debug-hidden-menu button:disabled { opacity: .4; }
+
+/* Santazon のリスト：バーは出さず、ドラッグでスクロール。いちばん上にいて続きがあるときは、▼がふよふよ */
+.santazon .sz-list::-webkit-scrollbar { display: none; }
+.santazon .sz-list { cursor: grab; user-select: none; -webkit-user-select: none; }
+.santazon .sz-list:active { cursor: grabbing; }
+.sz-scroll-hint {
+  position: absolute; left: 620px; bottom: 6px; z-index: 7; width: 90px; height: 60px; display: flex; align-items: center; justify-content: center;
+  font-size: 56px; line-height: 1; color: #4b14b4; pointer-events: none; animation: sz-scroll-bob .9s ease-in-out infinite alternate;
+}
+/* まだ下に続くときは、リストの下を白くぼかす */
+.sz-scroll-fade { position: absolute; left: 40px; width: 1250px; bottom: 0; height: 200px; z-index: 6; pointer-events: none; background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .92) 75%, #fff); }
+@keyframes sz-scroll-bob { from { transform: translateY(-10px); opacity: .7; } to { transform: translateY(8px); opacity: 1; } }
+
+.santazon .sz-side-btn.is-request.is-glow,
+.santazon .sz-side-btn.is-sock.is-glow { animation: guide-glow .7s ease-in-out infinite alternate; }
+
+/* ?debug=true：ソックスキーの答え（画面の上の真ん中に小さく） */
+.debug-sockkey { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 950; padding: 4px 18px; font-size: 24px; font-weight: 900; color: #fff; background: rgba(0, 0, 0, .7); border-radius: 999px; pointer-events: none; white-space: nowrap; }
+.debug-sockkey.is-inline { top: 20px; z-index: 3; }
+
+/* ?debug=true：リスト登録で出せるアイテム（左に小さく） */
+.santazon .sz-debug-items { position: absolute; left: 24px; top: 190px; margin: 0; padding: 8px 14px; list-style: none; z-index: 5; pointer-events: none; font-size: 22px; line-height: 1.5; color: #4b14b4; background: rgba(255, 255, 255, .8); border-radius: 12px; }
+.santazon .sz-debug-items b { font-family: monospace; color: #c25e00; }
+
+/* ?debug=true：ステージ1ゲーム1の答え（左に小さく） */
+.mark-debug { position: absolute; left: 20px; top: 20px; z-index: 5; margin: 0; padding: 10px 16px; list-style: none; font-size: 26px; font-weight: 900; line-height: 1.2; color: #fff; background: rgba(0, 0, 0, .55); border-radius: 12px; pointer-events: none; }
+.mark-debug li { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.mark-debug img { width: 44px; height: 44px; }
+.mark-debug b { min-width: 2.2em; font-size: 32px; color: #ffd400; }
+
+/* 押さえてワード：クリアしたら、背景のエリアは押せない */
+.word-stage.is-done { pointer-events: none; }
+
+/* 記録：文字だけのページ */
+.records-text { padding: 24px 28px; text-align: left; }
+.records-text p { margin: 8px 0 0; font-size: 34px; font-weight: 700; }
+.bingo-hint { white-space: pre-line; }
+
+/* ？が公開される：左上から、じわーっと本物に変わる */
+.is-wipe-in {
+  -webkit-mask-image: linear-gradient(135deg, #000 0%, #000 40%, transparent 60%, transparent 100%);
+  mask-image: linear-gradient(135deg, #000 0%, #000 40%, transparent 60%, transparent 100%);
+  -webkit-mask-size: 300% 300%;
+  mask-size: 300% 300%;
+  animation: bingo-reveal 1.5s ease-in-out both;
+}
+@keyframes bingo-reveal {
+  from { -webkit-mask-position: 100% 100%; mask-position: 100% 100%; }
+  to { -webkit-mask-position: 0% 0%; mask-position: 0% 0%; }
+}
+
+/* ジャックの説明中：下で話すエルフにかぶらないよう、ロビンの画面を上に寄せる */
+.bingo-jack-back.is-raised { align-items: flex-start; padding-top: 24px; box-sizing: border-box; }
+.modal.bingo-jack-modal { position: relative; }
+/* ジャック画面の✕：ダイアログ共通のボタンの黒い背景は付けない */
+.modal.bingo-jack-modal button.sz-close { background: transparent; box-shadow: none; }
+/* 「記録」ボタン（右端の1つ：x=1300〜1880）の上に出す案内 */
+.bingo-rule-note { position: absolute; right: 40px; bottom: 136px; width: 580px; box-sizing: border-box; padding: 12px 18px; z-index: 5; font-size: 24px; font-weight: 700; line-height: 1.4; text-align: center; white-space: pre-line; background: rgba(255, 255, 255, .92); border-radius: 16px; pointer-events: none; }
+/* Santazon の上のエルフの台詞でも、{ } で囲んだところは強調する */
+.sz-elf-line p .hl, .sz-elf-line p em .hl { color: var(--red); font-weight: 900; }
+.last-kid-hint { margin: 0 0 12px; font-size: 34px; font-weight: 900; text-align: center; color: var(--ink); }
+
+/* LAST のジャック：ルドリーの画面（Santazon の画面を 0.68 倍で見せる） */
+.last-kid-sz { position: relative; width: 1306px; height: 816px; overflow: hidden; border-radius: 24px; pointer-events: none; }
+.last-kid-sz-inner { position: absolute; left: 0; top: 0; width: 1920px; height: 1200px; transform: scale(.68); transform-origin: top left; background: #fff center / 100% 100% no-repeat; }
+.last-kid-sz-inner .lk-btn { position: absolute; left: 1370px; width: 521px; display: block; }
+.last-kid-sz-inner .lk-btn.is-off { filter: grayscale(.8); opacity: .45; }
+/* はい／いいえ（画面の真ん中に、大きく。角丸の長方形） */
+.sz-choice { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 2; display: flex; justify-content: center; gap: 100px; }
+.santazon .sz-choice .sz-btn { min-width: 440px; height: 150px; padding: 0 40px; font-size: 68px; font-weight: 900; border-radius: 28px; box-shadow: 0 8px 0 rgba(0, 0, 0, .25); }
+.santazon .sz-choice .sz-light { box-shadow: inset 0 0 0 4px #d5d9d9, 0 8px 0 rgba(0, 0, 0, .25); }

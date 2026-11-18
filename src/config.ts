@@ -18,7 +18,7 @@ export const KEYBOX_DEFAULTS: Record<number, { id: string; ch: number; ad: numbe
   4: { id: '54554D03', ch: 20, ad: 0x09 },
 }
 /** キーボックスに入れると開く番号（ひとまず） */
-export const KEYBOX_CODES = ['1111', '2222', '3333']
+export const KEYBOX_CODES = ['6476', '2222', '3333']
 /** 解錠してから、自動でもう一度施錠するまでの時間（開けて閉める間。閉じたことを知らせる信号が分かるまでの代わり） */
 export const KEYBOX_RELOCK_MS = 10000
 /** 何秒ボタンが押されなければ、途中までの入力を消すか */

@@ -68,8 +68,10 @@ export function useTeam(team: number): [TeamDoc, (patch: Partial<TeamDoc>) => vo
   )
   const update = useCallback(
     (patch: Partial<TeamDoc>) => {
+      // Firestore は undefined を入れられない（入れると保存が失敗する）ので、undefined の項目は落とす
+      const clean = JSON.parse(JSON.stringify({ ...patch, updatedAt: Date.now() }))
       getBackend()
-        .set('teams', String(team), { ...patch, updatedAt: Date.now() })
+        .set('teams', String(team), clean)
         .catch(() => {})
     },
     [team],

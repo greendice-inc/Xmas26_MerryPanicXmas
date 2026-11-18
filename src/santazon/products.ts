@@ -53,7 +53,7 @@ export const PRODUCTS: Product[] = [
   p('game1', 3, 'わなげ用リング', '1864', 0, true),
   p('game1', 4, 'クリスマスリース', '1839', 1, true),
   p('game1', 5, 'フラフープ', '2453', 1, true, '', '1で発送'),
-  p('game1', 6, 'ユビワ×1', '1717', 1, true, 'ユビワ1個のセット', '4のROUND2で発送'),
+  p('game1', 6, 'ユビワ1個', '1717', 1, true, 'ユビワ1個のセット', '4のROUND2で発送'),
   p('game2', 1, 'マネキン', '2222', 0, false),
   p('game2', 2, 'セーター', '2323', 0, false),
   p('game2', 3, 'オーバーオール', '1678', 0, false),
@@ -68,9 +68,9 @@ export const PRODUCTS: Product[] = [
   p('game4', 5, 'ポインセチア5鉢', '1418', 1, true),
   p('game4', 6, 'サッカーボール7個', '2002', 5, false, '', 'ファイナル1・4のROUND2で発送'),
   p('game4', 7, 'サプライズアイテム', '1998', 99, true, '何が届くかわからない', 'ロビンがラウンドごとに3つ注文している'),
-  p('game4', 8, 'グラス×3', '1531', 1, true, 'グラス3個のセット', '4のROUND1で発送'),
-  p('game4', 9, 'マッチ×3', '1642', 1, true, 'マッチ3箱のセット', '4のROUND1で発送'),
-  p('game4', 10, 'ハンカチ×1', '1753', 1, true, 'ハンカチ1枚のセット', '4のROUND1で発送'),
+  p('game4', 8, 'グラス3個', '1531', 1, true, 'グラス3個のセット', '4のROUND1で発送'),
+  p('game4', 9, 'マッチ3箱', '1642', 1, true, 'マッチ3箱のセット', '4のROUND1で発送'),
+  p('game4', 10, 'ハンカチ1枚', '1753', 1, true, 'ハンカチ1枚のセット', '4のROUND1で発送'),
   p('final', 1, 'レッドボール2個', '1020', 0, true, '直径10cmのボール', 'ファイナル2'),
   p('final', 2, 'ブルーボール2個', '0204', 0, true, '直径10cmのボール', 'ファイナル2'),
   p('final', 3, 'イエローボール2個', '2382', 1, true, '直径10cmのボール', 'ファイナル3'),
@@ -87,22 +87,34 @@ export const productById = (id: string): Product | undefined => PRODUCTS.find((x
 /** 同じコードの商品が複数ある場合は、すべて返す */
 export const productsByCode = (code: string): Product[] => PRODUCTS.filter((x) => x.code === code)
 
-/** 注文後に出す問題（仮）。カテゴリ（注文の先頭の商品）ごとに1問 */
+/** 注文後に出す問題。カテゴリ（注文の先頭の商品）ごとに1問。答えは書かず、注文の中身から計算する（sockKeyOf） */
 export interface Problem {
   /** 問題画像（public 配下のパス）。未設定ならプレースホルダー */
   image?: string
-  answer: string
-  /** 正解したときに見せる宅配ソックスの4桁 */
-  code: string
 }
 
 export const PROBLEMS: Record<CategoryKey, Problem> = {
-  game1: { answer: '1111', code: '1111' },
-  game2: { answer: '1234', code: '1234' },
-  game3: { answer: '1234', code: '3333' },
-  game4: { answer: '1234', code: '1234' },
-  game5: { answer: '1234', code: '1234' },
-  final: { answer: '1234', code: '1234' },
+  game1: {},
+  game2: {},
+  game3: {},
+  game4: {},
+  game5: {},
+  final: {},
+}
+
+/**
+ * ソックスキーの番号（宅配ソックスの番号。ナゾの答えも、取り出し依頼で入れる番号も、これ）。
+ * 注文した商品の4桁のアイテム番号を、桁ごとに足す。桁があふれたら一の位だけ使う。
+ * 例：a-b-c-d と e-f-g-h を注文 → (a+e)(b+f)(c+g)(d+h)
+ */
+export function sockKeyOf(codes: string[]): string {
+  return [0, 1, 2, 3].map((i) => codes.reduce((sum, c) => sum + (Number(c[i]) || 0), 0) % 10).join('')
+}
+
+/** 注文（カート）の中身から、ソックスキーの番号を出す。商品は、いまのアイテム番号（Firestore の値）を使う */
+export function sockKeyOfItems(items: { id: string; qty: number }[], products: Product[]): string {
+  const codes = items.flatMap((i) => Array.from({ length: i.qty }, () => products.find((p) => p.id === i.id)?.code ?? ''))
+  return sockKeyOf(codes)
 }
 
 export const MAX_CART = 3

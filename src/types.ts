@@ -119,6 +119,8 @@ export interface BingoProgress {
   /** 山札をめくる順（カードの番号） */
   kidOrder: number[]
   adultOrder: number[]
+  /** 取り出し依頼の説明を聞いた注文（Order.at）。注文し直したら、また説明する */
+  orderTold?: number
 }
 
 /** LAST：games/lastData.ts の LAST_STEPS を参照 */
@@ -126,6 +128,8 @@ export type LastStep = 'basket' | 'extract' | 'balls' | 'notice' | 'super'
 
 export interface LastProgress {
   step: LastStep
+  /** 「宅配ソックスが埋まっていた」の会話を聞いた（このあと「エルフに取り出し依頼」ボタンが使える） */
+  basketTold?: boolean
 }
 
 export const DEFAULT_LAST: LastProgress = { step: 'basket' }

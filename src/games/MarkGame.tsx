@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { KV_IMAGE } from '../config'
 import { hl, useLineSound } from '../components/GameTalk'
 import { lineImage } from '../script/gameScenes'
 import { useGameLines } from '../script/scriptData'
 import type { GameProps } from './index'
 
-/** ステージ1：マークの点数当て。点数は 0〜9 の一桁 */
-const MARKS = [
-  { id: 'heart', label: 'ハート', symbol: '❤️', answer: 1 },
-  { id: 'note', label: '音符', symbol: '🎵', answer: 2 },
-  { id: 'diamond', label: '菱形', symbol: '◆', answer: 3 },
-  { id: 'star', label: '星', symbol: '⭐', answer: 0 },
+/** ステージ1：マークの点数当て（ゲーム1）。ボタンの絵は public/BG/Stage1/mark1〜5.webp */
+const MARK_DIR = `${import.meta.env.BASE_URL}BG/Stage1/`
+export const MARKS = [
+  { id: 'sun', label: '太陽', image: `${MARK_DIR}mark1.webp`, answer: 30 },
+  { id: 'umbrella', label: '傘', image: `${MARK_DIR}mark2.webp`, answer: 20 },
+  { id: 'cloud', label: '雲', image: `${MARK_DIR}mark3.webp`, answer: 10 },
+  { id: 'snow', label: '雪の結晶', image: `${MARK_DIR}mark4.webp`, answer: 0 },
+  { id: 'bolt', label: '雷', image: `${MARK_DIR}mark5.webp`, answer: 1 },
 ] as const
+/** ゲーム1の背景 */
+const MARK_BG = `${MARK_DIR}1st_back_1.webp`
 
 type MarkId = (typeof MARKS)[number]['id']
 
@@ -28,6 +31,8 @@ type Guide = 'start' | 'picking' | 'wrongFirst' | 'wrong' | 'right' | 'done'
 const ALL_SOLVED = Object.fromEntries(MARKS.map((m) => [m.id, m.answer])) as Partial<Record<MarkId, number>>
 
 export default function MarkGame({ onClear, solved: allDone }: GameProps) {
+  // ?debug=true のときは、答えを左に出す
+  const debug = new URLSearchParams(location.search).get('debug') === 'true'
   const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : {})
   const [selected, setSelected] = useState<MarkId | null>(null)
   const [input, setInput] = useState('')
@@ -35,12 +40,13 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
   const mark = useGameLines('st1-mark')
   const missFirst = useGameLines('st1-mark-miss1')
   const miss = useGameLines('st1-mark-miss')
-  // 0=最初・選んだとき / 1=正解 / 2=全部わかった（マーク当て中）、不正解は別の場面
+  // mark-start=最初・選んだとき / mark-right=正解 / mark-done=全部わかった（マーク当て中）、不正解は別の場面
+  const one = (id: string) => mark.filter((l) => l.id === id)
   const GUIDE: Record<Guide, typeof mark> = {
-    start: mark.slice(0, 1),
-    picking: mark.slice(0, 1),
-    right: mark.slice(1, 2),
-    done: mark.slice(2, 3),
+    start: one('mark-start'),
+    picking: one('mark-start'),
+    right: one('mark-right'),
+    done: one('mark-done'),
     wrongFirst: missFirst,
     wrong: miss,
   }
@@ -101,7 +107,17 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
 
   return (
     <div className="game mark-game">
-      <img className="mark-bg" src={KV_IMAGE} alt="" />
+      <img className="mark-bg" src={MARK_BG} alt="" />
+      {debug && (
+        <ul className="mark-debug" aria-hidden>
+          {MARKS.map((m) => (
+            <li key={m.id}>
+              <img src={m.image} alt="" />
+              <b>{m.answer}</b> {m.label}
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="mark-body">
         <div className="mark-grid">
           {MARKS.map((m) => {
@@ -115,7 +131,7 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
                   disabled={answer !== undefined}
                   onClick={() => pick(m.id)}
                 >
-                  <span className="mark-symbol" aria-hidden>{m.symbol}</span>
+                  <img className="mark-img" src={m.image} alt="" draggable={false} />
                 </button>
               </div>
             )

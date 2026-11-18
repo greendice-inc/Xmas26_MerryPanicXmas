@@ -3,21 +3,27 @@ import type { BingoStep, OrderItem } from '../types'
 
 /**
  * ステージ4：カタカナビンゴ。
- * アイテムのカード「名前×N」をめくると、名前のN文字目と同じマスに、両方のカードで穴が開く
+ * アイテムのカード「名前N個」（単位は label）をめくると、名前のN文字目と同じマスに、両方のカードで穴が開く
  */
 
-/** 山札のカード。名前と数（×N） */
+/** 山札のカード。名前と数（N個） */
 export interface BingoItem {
   name: string
   n: number
-  /** 吹き出しに出す言い方（「バット3本」など）。なければ「名前×N」 */
+  /** 吹き出しに出す言い方（「バット3本」など）。なければ「名前N個」 */
   label?: string
 }
 
 /** 真ん中のマスを最初から開けておくか（資料の並びは9文字なので、いまは開けない） */
 export const FREE_CENTER = false
 
-export const itemLabel = (c: BingoItem) => c.label ?? `${c.name}×${c.n}`
+export const itemLabel = (c: BingoItem) => c.label ?? `${c.name}${c.n}個`
+/** めくったカードの表記：[名前, 数と単位]。「バット3本」→ ['バット', '3本']。数が入っていない言い方（「まくら」など）は「1個」 */
+export function itemParts(c: BingoItem): [string, string] {
+  const label = itemLabel(c)
+  const m = label.match(/^(.*?)(\d.*)$/)
+  return m && m[1] ? [m[1], m[2]] : [label, `${c.n}個`]
+}
 
 const SHEET_DIR = `${import.meta.env.BASE_URL}BG/Stage4/bingo/`
 /** ビンゴカードの画像（文字が乗った 450×450）。大人は青、ロビンは黄色 */
@@ -50,10 +56,10 @@ export interface BingoRound {
   /** 正しい注文の商品名（前方一致）。チュートリアルは注文しない */
   order?: string[]
   /**
-   * 注文のあとに出す問題と、宅配ソックスの番号。
-   * request=true は、ナゾの画面では答えず、Santazon の取り出し依頼ボタンで番号（answer）を入れる
+   * 注文のあとに出す問題。番号は、注文の中身から計算する（products.ts の sockKeyOf）。
+   * request=true は、ナゾの画面では答えず、Santazon の取り出し依頼ボタンで番号を入れる
    */
-  problem?: { image?: string; answer: string; code: string; request?: boolean }
+  problem?: { image?: string; request?: boolean }
 }
 
 /** チュートリアル。ロビンが先にビンゴする */
@@ -65,8 +71,8 @@ export const TUTORIAL: BingoRound = {
   // めくる順（チュートリアルはシャッフルしない）
   kidDeck: [
     { name: 'シュークリーム', n: 5 },
-    { name: 'ブリキのロボット', n: 1 },
-    { name: 'タイコ', n: 3 },
+    { name: 'ブリキのロボット', n: 1, label: 'ブリキのロボット1体' },
+    { name: 'タイコ', n: 3, label: 'たいこ3個' },
   ],
   adultDeck: [
     { name: 'ボート', n: 3 },
@@ -76,9 +82,9 @@ export const TUTORIAL: BingoRound = {
 }
 /** 山札のそばに出す中身（チュートリアルは表示の順とめくる順が違う） */
 export const TUTORIAL_KID_LIST: BingoItem[] = [
-  { name: 'ブリキのロボット', n: 1 },
+  { name: 'ブリキのロボット', n: 1, label: 'ブリキのロボット1体' },
   { name: 'シュークリーム', n: 5 },
-  { name: 'タイコ', n: 3 },
+  { name: 'タイコ', n: 3, label: 'たいこ3個' },
 ]
 
 export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
@@ -94,11 +100,11 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
     ],
     adultDeck: [
       { name: 'グラス', n: 3 },
-      { name: 'マッチ', n: 3 },
-      { name: 'ハンカチ', n: 1 },
+      { name: 'マッチ', n: 3, label: 'マッチ3箱' },
+      { name: 'ハンカチ', n: 1, label: 'ハンカチ1枚' },
     ],
     order: ['グラス', 'マッチ', 'ハンカチ'],
-    problem: { answer: '2828', code: '2828', request: true },
+    problem: { request: true },
   },
   r2: {
     adult: card('ウナヘ', 'ギアラ', 'カルク'),
@@ -111,12 +117,12 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
       { name: 'ウサギ', n: 1, label: 'ウサギのぬいぐるみ' },
     ],
     adultDeck: [
-      { name: 'ヘビ', n: 1 },
+      { name: 'ヘビ', n: 1, label: 'ヘビ1匹' },
       { name: 'ユビワ', n: 1 },
       { name: 'サッカーボール', n: 7 },
     ],
     order: ['ヘビ', 'ユビワ', 'サッカーボール'],
-    problem: { answer: '3939', code: '3939', request: true },
+    problem: { request: true },
   },
 }
 

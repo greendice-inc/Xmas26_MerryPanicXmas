@@ -17,7 +17,9 @@ import {
   saveSound,
   saveImage,
   imageUrl,
+  isNamedLine,
   sceneLines,
+  seedScenes,
   soundUrl,
   toNovelScene,
   useScript,
@@ -142,6 +144,16 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
     }
   }
 
+  const seedAll = async () => {
+    setStatus({ text: '登録中…' })
+    try {
+      const n = await seedScenes(script)
+      setStatus({ text: `${n}場面をDBに登録しました。これ以降、セリフはDBが本体です` })
+    } catch {
+      setStatus({ text: '登録できませんでした。Firestore のルール（script）を確認してください', error: true })
+    }
+  }
+
   const back = () => {
     if (dirty && !confirm('保存していない変更があります。破棄して戻りますか？')) return
     onBack()
@@ -186,6 +198,11 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
         </div>
         <div className="catalog-header-actions">
           {status && <span className={`script-status${status.error ? ' is-error' : ''}`}>{status.text}</span>}
+          {SCENES.some((s) => !script.savedScenes[s.id]) && (
+            <button className="catalog-back" onClick={seedAll} title="まだDBに保存していない場面に、コードの初期セリフを書き込みます（保存済みの場面には触りません）">
+              全場面をDBに登録
+            </button>
+          )}
           <button className="catalog-submit" disabled={!dirty} onClick={saveAll}>
             {dirty ? '保存' : '保存済み'}
           </button>
@@ -231,7 +248,7 @@ export default function ScriptScreen({ onBack }: { onBack: () => void }) {
                 <button key={s.id} className={on ? 'on' : ''} onClick={() => setSceneSel((m) => ({ ...m, [tab]: s.id }))}>
                   <small>{s.game ? 'ゲーム画面' : '会話'}</small>
                   {s.label}
-                  {scenes[s.id] ? <i>●</i> : script.savedScenes[s.id] ? <em>保存済み</em> : null}
+                  {scenes[s.id] ? <i>●</i> : script.savedScenes[s.id] ? <em>保存済み</em> : <em title="まだDBに保存していません（コードの初期セリフを使っています）。上の「全場面をDBに登録」で保存できます">未登録</em>}
                 </button>
               )
             })}
@@ -415,7 +432,7 @@ function SceneEditor({
       {def.game && (
         <p className="script-hint script-scene-note">
           ゲーム画面の上に出る会話です。{def.noPos ? 'マーク当ての下の枠に出ます。' : '「位置」で、下（ボタンのすぐ上）か上かを選べます。'}
-          {def.fixed && ' 行ごとに演出（ボタンを光らせる・カードを配るなど）が決まっているので、行の数と順番は変えられません。'}
+          {def.base.lines.some((l) => l.id) && ' 🔒の付いた行は、ゲームの演出（ボタンを光らせる・カードを配るなど）が結びついているので、消したり並べ替えたりできません（文章は直せます）。その前後には、自由にセリフを足せます。'}
           「▶ この場面を再生」は会話の画面で流します（位置はゲームで確かめてください）。
         </p>
       )}
@@ -441,7 +458,7 @@ function SceneEditor({
           />
         ))}
       </ol>
-      {!def.fixed && <button className="script-add-line" onClick={() => insert(lines.length)}>＋ セリフを追加</button>}
+      <button className="script-add-line" onClick={() => insert(lines.length)}>＋ セリフを追加</button>
     </section>
   )
 }
@@ -479,6 +496,7 @@ function LineRow({
   images: ScriptImage[]
   onUploadImage: (file: File) => Promise<string | null>
 }) {
+  const named = isNamedLine(def, line.id)
   const c = chars.find((x) => x.id === line.char)
   const portrait = line.kind === 'talk' ? charImage(c, line.emotion) : undefined
   return (
@@ -536,6 +554,7 @@ function LineRow({
               <select value={line.pos ?? 'bottom'} onChange={(e) => onEdit({ pos: e.target.value === 'bottom' ? undefined : (e.target.value as ScriptLine['pos']) })}>
                 <option value="bottom">下（ボタンのすぐ上）</option>
                 <option value="top">上</option>
+                <option value="corner">右上（小さく）</option>
                 <option value="shop">左下（Santazonを開いている間）</option>
               </select>
             </label>
@@ -563,18 +582,21 @@ function LineRow({
         <div className="script-line-row">
           <SoundField label="SE" value={line.se} sounds={sounds} onChange={(v) => onEdit({ se: v })} onUpload={onUpload} />
           <SoundField label="音声" value={line.voice} sounds={sounds} onChange={(v) => onEdit({ voice: v })} onUpload={onUpload} />
+          <label className="script-pos" title="音声が鳴り終わったら、タップを待たずに次の台詞へ進みます（音声が入っていない台詞は、タップで進みます）">
+            <input type="checkbox" checked={!!line.auto} onChange={(e) => onEdit({ auto: e.target.checked || undefined })} />
+            音声が終わったら自動で次へ
+          </label>
           <ImageField value={line.slide} images={images} onChange={(v) => onEdit({ slide: v })} onUpload={onUploadImage} />
         </div>
       </div>
-      {!def.fixed && (
-        <div className="script-line-actions">
-          <button onClick={() => onMove(-1)} disabled={first} aria-label="上へ">↑</button>
-          <button onClick={() => onMove(1)} disabled={last} aria-label="下へ">↓</button>
-          <button onClick={onInsert} title="下にセリフを追加">＋</button>
-          <button onClick={onCopy} title="複製">複製</button>
-          <button className="script-danger" onClick={onRemove}>削除</button>
-        </div>
-      )}
+      <div className="script-line-actions">
+        {named && <span title="ゲームの演出が結びついている行（消す・並べ替えはできません）">🔒</span>}
+        <button onClick={() => onMove(-1)} disabled={first || named} aria-label="上へ">↑</button>
+        <button onClick={() => onMove(1)} disabled={last || named} aria-label="下へ">↓</button>
+        <button onClick={onInsert} title="下にセリフを追加">＋</button>
+        <button onClick={onCopy} title="複製">複製</button>
+        <button className="script-danger" onClick={onRemove} disabled={named}>削除</button>
+      </div>
     </li>
   )
 }

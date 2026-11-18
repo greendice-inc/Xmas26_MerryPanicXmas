@@ -9,6 +9,8 @@ export function backgroundImage(folder: string): string {
 }
 
 export interface NovelLine {
+  /** 行の名前。ゲームの演出（待つ・矢印・カード など）は、行の番号ではなくこの名前に結びつく */
+  id?: string
   speaker: string
   text: string
   /** 表情（省略時は真顔） */
@@ -30,8 +32,10 @@ export interface NovelLine {
   /** この台詞が出たときに鳴らす効果音・音声（URL） */
   se?: string
   voice?: string
+  /** 音声（voice）が鳴り終わったら、タップを待たずに次の台詞へ進む（フルボイスの台詞用。音声が無い台詞は、タップで進む） */
+  auto?: boolean
   /** ゲーム画面の会話の位置（bottom=下のボタンのすぐ上 / top=画面の上 / shop=Santazon を開いている間の左下） */
-  pos?: 'bottom' | 'top' | 'shop'
+  pos?: 'bottom' | 'top' | 'shop' | 'corner'
 }
 
 /** ハートを押したときに出す「キモチ」 */
@@ -121,6 +125,8 @@ export const MANNEQUIN_IMAGE = `${BASE}slide/st2/card.png`
 /** 「記録」から見返せる画像 */
 export const RECORDS: Record<string, { title: string; image: string }> = {
   'st2-card': { title: 'マネキンとセーターの商品カード', image: `${BASE}slide/st2/card.png` },
+  // ステージ4 ROUND1 で発送したアイテムとソックスキー（中身はゲーム画面で作る。画像なし）
+  'st4-r1': { title: 'ROUND1で発送したアイテムとソックスキー', image: '' },
 }
 
 /** ステージ2：三人のキモチ。誰がどの名前かはわからないので、アイコンはシルエットのまま */
@@ -265,18 +271,21 @@ export const JACK_ICON = `${BASE}BG/Common/noz_icon.webp`
 export const ST4_MOOD: Mood = {
   icon: characterImage('Stage4', '楽'),
   name: ST4_NAME,
-  lines: [{ text: '勝ちたいなあ～' }],
+  lines: [{ text: 'アタシはアタシのラッキーを信じて勝つよ！' }, { text: 'アイテムも直感でパパッと選んで、サクッと2戦とも勝つわ！' }],
 }
 
-/** ステージ4の導入。ロビンとカタカナビンゴ（ルール説明の続きはゲーム画面で） */
+/** ステージ4の導入。ロビン（ゲームマスターの子）とカタカナビンゴ（ルール説明の続きはゲーム画面で） */
 const STAGE4_INTRO: NovelScene = {
   character: 'Stage4',
   background: 'Stage4',
   lines: [
-    { speaker: ST4_NAME, text: 'あ！対戦相手？', emotion: '真顔' },
-    { speaker: ST4_NAME, text: '勝つぞ～！', emotion: '楽' },
-    { speaker: 'エルフ', character: 'Common', text: '今回のゲームのルールを説明します。', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: '最初はチュートリアルを行いながらルールを説明します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '続いて、第4ゲームです。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '子ども部屋からの通信です。', emotion: '真顔' },
+    { speaker: 'ゲームマスターの子', text: 'ハロー！', emotion: '楽' },
+    { speaker: 'ゲームマスターの子', text: 'アタシはロビンっていうの！', emotion: '楽' },
+    { speaker: 'ゲームマスターの子', text: "アタシとのゲームは『アイテムビンゴ』！", emotion: '楽' },
+    { speaker: 'エルフ', character: 'Common', text: 'santazonで発送されるアイテムのカードを使って\nビンゴを行います。先にビンゴを達成した方が勝ちです。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'ゲームの流れを、画面を見せながら説明していきましょう。', emotion: '真顔' },
   ],
 }
 
@@ -301,24 +310,28 @@ export const LAST_MOOD_AFTER: Mood = {
 const master = (text: string, emotion: Emotion = '真顔'): NovelLine => ({ speaker: MASTER_ELF_NAME, text, emotion, charSrc: masterElfImage(emotion) })
 const rud = (text: string, emotion: Emotion = '哀', speaker = STF_NAME): NovelLine => ({ speaker, text, emotion })
 
-/** LAST：大人がルドリーのアイテムを取り出してしまったあと。マスターエルフが出てくる */
+/** LAST：大人がルドリーのアイテムを取り出してしまったあと。マスターエルフが出てくる（ルドリーはフルボイス：音声が鳴り終わったら自動で次へ） */
+const RUD_FULL = 'ゲームマスター・ルドリー'
+const rudAuto = (text: string, emotion: Emotion = '哀', speaker = RUD_FULL): NovelLine => ({ ...rud(text, emotion, speaker), auto: true })
 const LAST_TWIST: NovelScene = {
   character: 'StageF',
   background: 'StageF',
   lines: [
     master('あなた達、何をしてるんですか！？\nルドリーの様子を見てみなさい！！', '怒'),
-    rud('なんかね、アイテムをね、発送したんだけど、\n宅配ソックスには届いたって連絡は来てて、'),
-    rud('そのナゾを解いたんだけど、\n開けようとしたら、モニターは消えてて、'),
-    rud('番号は合ってるはずなのに、開かなくて……'),
+    rudAuto('なんかね、アイテムをね、発送したんだけど、'),
+    rudAuto('宅配ソックスには届いたって連絡は来てて、'),
+    rudAuto('そのナゾを解いたんだけど、\n開けようとしたら、モニターは消えてて、'),
+    rudAuto('番号は合ってるはずなのに、開かなくて……'),
     master('あなた達、とんでもないことをしましたね。', '怒'),
     master('あなた達が宅配ソックスから取り出した、いえ奪ったのは、\nまさしくルドリーが注文したアイテムです。', '怒'),
     master('結果として、あなた達は\n生還目標ポイントを獲得できたかもしれません。'),
-    master('しかし……当然ですが……'),
-    master('ルドリーをこんな目に合わせるような大人を、\nエルフとして許すわけにはいきません。', '怒'),
+    master('しかし……当然ですが……ルドリーをこんな目に合わせるような\n大人を、エルフとして許すわけにはいきません。', '怒'),
     master('心を読んでみましょうか？'),
-    rud('どうして宅配ソックスが開かないんだろう？\n今のままじゃ、何もできないままボクが負けちゃう！', '哀', 'ルドリー（心の声）'),
-    rud('……でも、あきらめちゃだめだ！\nここから逆転する方法があるはずだ。', '真顔', 'ルドリー（心の声）'),
-    rud('こうなったらなんとかして勝って終わりたい……！\nいち、に、に、ご……いち、に、に、ご……', '怒', 'ルドリー（心の声）'),
+    rudAuto('どうして宅配ソックスが開かないんだろう？', '哀', 'ルドリー（心の声）'),
+    rudAuto('今のままじゃ、何もできないままボクが負けちゃう！', '哀', 'ルドリー（心の声）'),
+    rudAuto('……でも、あきらめちゃだめだ！\nここから逆転する方法があるはずだ。', '真顔', 'ルドリー（心の声）'),
+    rudAuto('こうなったらなんとかして勝って終わりたい……！', '怒', 'ルドリー（心の声）'),
+    rudAuto('いち、に、に、ご……いち、に、に、ご……', '怒', 'ルドリー（心の声）'),
     master('どうやら、ルドリーはまだ希望を捨てていないようです。'),
     master('先ほどあなた達が大人部屋で取った行動を\n打ち消すことはできません。'),
     master('そして、大人部屋に入ること自体もうできません。'),
@@ -335,30 +348,36 @@ const LAST_INTRO: NovelScene = {
   background: 'StageF',
   lines: [
     { speaker: 'エルフ', character: 'Common', text: 'さて、いよいよ次が最後のゲームですね。', emotion: '真顔' },
-    { speaker: '？？？', text: 'いよいよファイナルゲーム。\nこのボク、ルドリーが相手だ！', emotion: '楽' },
-    { speaker: STF_NAME, text: 'ファイナルゲームは「エントツギフト」\nルールは簡単。', emotion: '楽' },
-    { speaker: STF_NAME, text: '子ども部屋と大人部屋に、\nこのゲームのためのエントツが用意されているんだ。', emotion: '真顔' },
-    { speaker: STF_NAME, text: 'このエントツにボールが通ったら10ポイントで、\n最終的にポイントが多い方が勝ち！', emotion: '楽' },
-    { speaker: STF_NAME, text: '詳しいルール説明はエルフさん、お願いします！', emotion: '喜' },
-    { speaker: 'エルフ', character: 'Common', text: 'それでは詳しいルールについて説明します。\nまず、ポイントの獲得方法について。', emotion: '真顔', slide: entotsu('') },
+    { speaker: 'エルフ', character: 'Common', text: '子ども部屋の様子を見てみましょう。', emotion: '真顔' },
+    // ルドリーの最初の説明はフルボイス：音声が鳴り終わったら自動で次へ
+    { speaker: RUD_FULL, text: 'いよいよファイナルゲーム。\nこのボク、ルドリーが相手だ！', emotion: '楽', auto: true },
+    { speaker: RUD_FULL, text: 'ファイナルゲームは「エントツギフト」\nルールは簡単。', emotion: '楽', auto: true },
+    { speaker: RUD_FULL, text: '子ども部屋と大人部屋に、\nこのゲームのためのエントツが用意されているんだ。', emotion: '真顔', auto: true },
+    { speaker: RUD_FULL, text: 'このエントツにボールが通ったら10ポイントで、\n最終的にポイントが多い方が勝ち！', emotion: '楽', auto: true },
+    { speaker: RUD_FULL, text: '詳しいルール説明はエルフさん、お願いします！', emotion: '喜', auto: true },
+    { speaker: 'エルフ', character: 'Common', text: 'それでは詳しいルールについて説明します。\nまず、ポイントの獲得方法についての詳細を。', emotion: '真顔', slide: entotsu('') },
     { speaker: 'エルフ', character: 'Common', text: 'エントツの内部には、一番下のところにセンサーがあり、', emotion: '真顔', slide: entotsu('2') },
     { speaker: 'エルフ', character: 'Common', text: 'ここを1個のボールが1回通過するたびに\n10ポイントが入ります。', emotion: '真顔', slide: entotsu('3') },
+    { speaker: 'エルフ', character: 'Common', text: 'ボールの準備はsantazonを使ってもらいます。', emotion: '真顔' },
     { speaker: 'エルフ', character: 'Common', text: 'このゲームでは大人チームが先に行動をします。', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: '大人チームは必要だと思うアイテムを発送し、\n用意したすべてのボールをエントツに投入します。', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: 'その後、子どもチームが同様にアイテムを発送し、\nすべてのボールをエントツに投入します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '準備ができたら、大人たちは大人部屋に向かってください。\nそこで、用意したすべてのボールをエントツに投入します。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'その後、子どもチームも同様に、\n用意したすべてのボールをエントツに投入します。', emotion: '真顔' },
     { speaker: 'エルフ', character: 'Common', text: 'ボールの投入をはじめとした行動は、\nすべてエルフが行います。', emotion: '真顔' },
     { speaker: 'エルフ', character: 'Common', text: 'エントツの上の端の高さから、勢いをつけずに落とすので、\n大人も子どもも同じ条件で投入されることになります。', emotion: '真顔' },
-    { speaker: 'ゲームマスター・ルドリー', text: 'それから、ボクはあんまりよく知らないんだけど、\n大人はこのゲームで達成しないといけない目標があるんだよね？', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: 'そうです。このゲームを通して、大人たちは\n200ポイントを越えるポイントを獲得しなければなりません。', emotion: '真顔' },
+    { speaker: RUD_FULL, text: 'それから、ボクはあんまりよく知らないんだけど……', emotion: '真顔' },
+    { speaker: RUD_FULL, text: '大人のみんなは、このゲームで達成しないといけない\n{目標}があるんだよね？', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'そうです。', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'このゲームを通して、大人たちは{200ポイントを越えるポイント}を\n獲得しなければなりません。', emotion: '真顔' },
     { speaker: 'エルフ', character: 'Common', text: '200ポイントちょうどではダメです。\n200ポイントを越えてください。', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: 'これは、このゲームに真剣に取り組んでもらうための\n目標設定であり、', emotion: '真顔' },
-    { speaker: 'エルフ', character: 'Common', text: '大人の皆さんはこの条件を達成しないと生還できません。\n是非がんばってくださいね。', emotion: '楽' },
-    { speaker: 'ゲームマスター・ルドリー', text: '大人って大変なんだね。', emotion: '哀' },
-    { speaker: 'ゲームマスター・ルドリー', text: 'ボクとしても、この最後のゲームでは\n大人のみんなにも全力を出してほしいんだ。', emotion: '真顔' },
-    { speaker: 'ゲームマスター・ルドリー', text: '真剣勝負の結果なら、もし負けたとしても、\nボクは笑って終われると思うから。', emotion: '楽' },
+    { speaker: 'エルフ', character: 'Common', text: 'これは、このゲームに真剣に取り組んでもらうための\n目標設定であり……', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: '大人の皆さんは{この条件を達成しないと生還できません。}', emotion: '真顔' },
+    { speaker: 'エルフ', character: 'Common', text: 'しっかり生還できるよう、ぜひがんばってくださいね。', emotion: '楽' },
+    { speaker: RUD_FULL, text: '大人って大変なんだね。', emotion: '哀' },
+    { speaker: RUD_FULL, text: 'ボクとしても、この最後のゲームでは\n{大人のみんなにも全力を出してほしい}んだ。', emotion: '真顔' },
+    { speaker: RUD_FULL, text: '真剣勝負の結果なら、もし負けたとしても、\n{ボクは笑って終われると思う}から。', emotion: '楽' },
     { speaker: 'エルフ', character: 'Common', text: 'それでは間もなくゲーム開始となります。', emotion: '真顔' },
-    { speaker: 'ゲームマスター・ルドリー', text: 'じゃあボクも準備を始めよう。\n大人のキミたちもがんばってね！', emotion: '喜' },
-    { speaker: 'エルフ', character: 'Common', text: '必要なアイテムを発送し、\nあなた達の「大人の全力」を見せてください。', emotion: '楽' },
+    { speaker: RUD_FULL, text: 'じゃあボクも準備を始めよう。\n大人のキミたちもがんばってね！', emotion: '喜' },
+    { speaker: 'エルフ', character: 'Common', text: '必要なアイテムを発送し、\nあなたたちの「大人の全力」を見せてください。', emotion: '楽' },
   ],
 }
 

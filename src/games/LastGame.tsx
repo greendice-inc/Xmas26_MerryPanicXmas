@@ -9,9 +9,25 @@ import { LAST_ADULT_POINTS, LAST_KID_POINTS } from './lastData'
 import { ASPECT, WORD_GAMES, WordBoard } from './WordGame'
 import { useWordAreas } from './wordAreas'
 
+/** Santazon の画像（public/BG/Common/santazon） */
+const SZ_DIR = `${import.meta.env.BASE_URL}BG/Common/santazon/`
 const BG: CSSProperties = { backgroundImage: `url(${backgroundImage('StageF')})` }
 /** ルドリーの得点が10点ずつ入る間隔 */
-const COUNT_MS = 380
+/** 1回目が入るまで */
+const COUNT_FIRST_MS = 800
+/** 「タン、タタン、タタン、タタン…」のリズム：2発ずつの組になる。組と組のあいだは長め、組の中の2発目は短め（少しだけ揺らす） */
+const COUNT_LONG_MS = 520
+const COUNT_SHORT_MS = 170
+const COUNT_JITTER_MS = 30
+/** だんだん間隔が短くなる：1回入るごとに、間隔が前の 0.98 倍になる（長い間隔も短い間隔も、同じ割合で縮むので、リズムは保ったまま速くなる） */
+const COUNT_DECAY = 0.98
+/** n 回目の10ポイントが入るまでの間 */
+function nextCountDelay(n: number): number {
+  if (n <= 1) return COUNT_FIRST_MS
+  const ratio = COUNT_DECAY ** (n - 2)
+  const base = (n % 2 === 0 ? COUNT_LONG_MS : COUNT_SHORT_MS) * ratio
+  return Math.round(base + (Math.random() * 2 - 1) * COUNT_JITTER_MS * ratio)
+}
 /** ジャック機能で見える、ルドリーの注文ナゾ（画像が来たら public 配下のパスを入れる） */
 const KID_PROBLEM_IMAGE: string | undefined = undefined
 
@@ -53,20 +69,28 @@ interface Props {
   doc: TeamDoc
   update: (patch: Partial<TeamDoc>) => void
   shopOpen: boolean
-  /** 【重要】の通知を押した。マスターエルフの会話へ */
+  /** 警告マークの通知を押した。マスターエルフの会話へ */
   onNotice: () => void
 }
 
 /** LAST：エントツギフトのゲーム画面。お互いの得点と、ジャック機能・キモチ */
 export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
   const last: LastProgress = { ...DEFAULT_LAST, ...doc.last }
-  const extractLine = useGameLines('st5-extract')[0]
+  const extractLines = useGameLines('st5-extract')
+  // 取り出し依頼のあとの会話の、いま何行目か
+  const [extractIdx, setExtractIdx] = useState(0)
+  const extractLine = extractLines[extractIdx]
+  const nextExtract = () => {
+    if (extractIdx + 1 < extractLines.length) return setExtractIdx(extractIdx + 1)
+    setExtractIdx(0)
+    update({ last: { ...last, step: 'balls' } })
+  }
   const { ref, overlay } = usePortal()
   const [jackOpen, setJackOpen] = useState(false)
   // 大人部屋でボールを入れたあと（通知が来たころ）には、大人の得点が入っている
   const adult = last.step === 'notice' || last.step === 'super' ? LAST_ADULT_POINTS : 0
-  // ルドリーの画面は、アイテムを取り出したあとはモニターが消えている
-  const kidScreenOff = last.step !== 'basket'
+  // ルドリーの画面は、大人がボールを入れて警告マークの通知が来たあと（宅配ソックスが開かなくなったとき）は、モニターが消えている
+  const kidScreenOff = last.step === 'notice' || last.step === 'super'
 
   return (
     <div className="last-game" ref={ref} style={BG}>
@@ -82,22 +106,31 @@ export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
             <div className="modal bingo-jack-modal" onClick={(e) => e.stopPropagation()}>
               <h2>
                 <img src={JACK_ICON} alt="" />
-                {STF_NAME}の画面（見るだけ）
+                {STF_NAME}の画面
               </h2>
               {kidScreenOff ? (
                 <div className="last-kid-screen is-off">画面が映っていない…</div>
               ) : (
-                // ルドリーの注文ナゾ。見るだけで、ここからは答えられない
-                <div className="last-kid-screen">
-                  <div className="last-kid-title">宅配ソックスを開けるためにナゾを解こう。</div>
-                  <div className="last-kid-body">
-                    {KID_PROBLEM_IMAGE ? (
-                      <img className="sz-problem-img" src={KID_PROBLEM_IMAGE} alt="" />
-                    ) : (
-                      <div className="sz-problem-img placeholder">問題画像（ルドリーの注文ナゾ）</div>
-                    )}
-                    <div className="last-kid-pad">
-                      <TenKey length={4} onSubmit={() => {}} />
+                // ルドリーの画面：背景は Santazon。宅配ソックスのナゾが出ていて、「ソックスキーを導く」と「エルフに取り出し依頼」は押せない。見るだけで、ここからは答えられない
+                <div className="last-kid-sz">
+                  <div className="last-kid-sz-inner" style={{ backgroundImage: `url("${SZ_DIR}san_back 1.webp")` }}>
+                    <img className="lk-btn" style={{ top: 660, height: 261 }} src={`${SZ_DIR}cart2.webp`} alt="" />
+                    <img className="lk-btn is-off" style={{ top: 935, height: 111 }} src={`${SZ_DIR}cart3.webp`} alt="" />
+                    <img className="lk-btn is-off" style={{ top: 1060, height: 111 }} src={`${SZ_DIR}cart4.webp`} alt="" />
+                    <div className="sz-dialog-back">
+                      <div className="sz-dialog sz-problem">
+                        <div className="problem-body">
+                          {KID_PROBLEM_IMAGE ? (
+                            <img className="sz-problem-img" src={KID_PROBLEM_IMAGE} alt="" />
+                          ) : (
+                            <div className="sz-problem-img placeholder">問題画像（ルドリーの注文ナゾ）</div>
+                          )}
+                          <div>
+                            <p className="last-kid-hint">わかったら打ち込もう！</p>
+                            <TenKey length={4} onSubmit={() => {}} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -110,7 +143,7 @@ export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
       {last.step === 'extract' &&
         overlay(
           <>
-            <div className="hide-catch" onClick={() => update({ last: { ...last, step: 'balls' } })} />
+            <div className="hide-catch" onClick={nextExtract} />
             {extractLine && <GameTalk line={extractLine} compact={shopOpen} />}
           </>,
         )}
@@ -119,7 +152,12 @@ export default function LastGame({ doc, update, shopOpen, onNotice }: Props) {
         overlay(
           <div className="last-notice-back">
             <button className="last-notice" onClick={onNotice}>
-              <span className="last-notice-tag">【重要】</span>
+              {/* 警告マーク（三角に！） */}
+              <svg className="last-notice-mark" viewBox="0 0 120 108" aria-hidden>
+                <path d="M60 6 L114 100 H6 Z" fill="#ffd400" stroke="#e00018" strokeWidth="9" strokeLinejoin="round" />
+                <rect x="53" y="38" width="14" height="34" rx="6" fill="#e00018" />
+                <circle cx="60" cy="86" r="8" fill="#e00018" />
+              </svg>
               <b>マスターエルフより緊急のお知らせ</b>
               <small>タップして確認してください</small>
             </button>
@@ -146,7 +184,7 @@ export function LastEnding() {
       }, 1200)
       return () => clearTimeout(t)
     }
-    const t = setTimeout(() => setKid((k) => k + 10), kid === 0 ? 800 : COUNT_MS)
+    const t = setTimeout(() => setKid((k) => k + 10), nextCountDelay(kid / 10 + 1))
     return () => clearTimeout(t)
   }, [part, kid])
 
@@ -181,7 +219,7 @@ export function LastEnding() {
         overlay(
           <>
             <div className="hide-catch" onClick={next} />
-            {lines[idx] && <GameTalk line={lines[idx]} key={`${part}${idx}`} />}
+            {lines[idx] && <GameTalk line={lines[idx]} />}
           </>,
         )}
     </div>

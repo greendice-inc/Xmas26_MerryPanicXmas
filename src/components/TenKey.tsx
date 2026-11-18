@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 /**
  * 数字を入れるテンキー（Nintendo Switch 2 の数字入力を参考にした並び）。
- * 1〜9 を3列、0 は下の真ん中。右の列に ⌫ と OK
+ * 電話と同じ3列の並び：1〜9、下の段が ⌫・0・OK。全体が左右対称で、2・5・8・0 の列が真ん中に来る
  */
 export default function TenKey({
   length,
@@ -40,10 +40,15 @@ export default function TenKey({
         <button className="tenkey-key" style={{ gridRow: 4, gridColumn: 2 }} onClick={() => put('0')}>
           0
         </button>
-        <button className="tenkey-key is-side" style={{ gridRow: 1, gridColumn: 4 }} onClick={() => setValue((v) => v.slice(0, -1))} aria-label="1文字消す">
+        <button className="tenkey-key is-side" style={{ gridRow: 4, gridColumn: 1 }} onClick={() => setValue((v) => v.slice(0, -1))} aria-label="1文字消す">
           ⌫
         </button>
-        <button className="tenkey-key is-ok" style={{ gridRow: '2 / span 3', gridColumn: 4 }} disabled={value.length !== length} onClick={submit}>
+        <button
+          className="tenkey-key is-ok"
+          style={{ gridRow: 4, gridColumn: 3 }}
+          disabled={value.length !== length}
+          onClick={submit}
+        >
           {okLabel}
         </button>
       </div>

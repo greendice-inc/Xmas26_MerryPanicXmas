@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import AreaEditor from '../components/AreaEditor'
 import GameTalk from '../components/GameTalk'
 import { st3GameImage, type NovelLine } from '../scenario'
-import { useGameLines } from '../script/scriptData'
+import { lineIndex, useGameLines } from '../script/scriptData'
 import { DEFAULT_WORD, type TeamDoc, type WordProgress } from '../types'
 import { resetWordAreas, saveWordAreas, useWordAreas, wordAreasToCode, type WordArea } from './wordAreas'
 
@@ -18,16 +18,14 @@ const ROOM_GOAL = '必要なアイテムがあれば、発送してから部屋�
 const CHAIR_GOAL = 'イスの上に立つのは禁止。イスの上にモノを置くのは大丈夫。'
 
 /** ルール説明（st3-rule）の行ごとに見せる見本。「テブクロ → ネブクロ → クロネコ」 */
-const RULE_DEMO: Record<number, { label: string; word: string }> = {
-  1: { label: '押さえるワード', word: 'テブクロ' },
-  2: { label: '押さえるワード', word: 'テブクロ' },
-  3: { label: '問題', word: '眠る時に使うもの' },
-  4: { label: '問題', word: '眠る時に使うもの' },
-  5: { label: '答え', word: 'ネブクロ' },
-  6: { label: '答え', word: 'クロネコ' },
+const RULE_DEMO: Record<string, { label: string; word: string }> = {
+  demo1: { label: '押さえるワード', word: 'テブクロ' },
+  demo2: { label: '押さえるワード', word: 'テブクロ' },
+  demo3: { label: '問題', word: '眠る時に使うもの' },
+  demo4: { label: '問題', word: '眠る時に使うもの' },
+  demo5: { label: '答え', word: 'ネブクロ' },
+  demo6: { label: '答え', word: 'クロネコ' },
 }
-/** ラウンド2のあと（st3-after-g2）で、この行から部屋の画面を見せる */
-const ROOM_FROM = 4
 /** 部屋でやるお題 */
 const THEME = 'クリスマスツリー'
 
@@ -110,6 +108,8 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
   const AFTER_G1 = useGameLines('st3-after-g1')
   const AFTER_G2 = useGameLines('st3-after-g2')
   const CHAIR = useGameLines('st3-chair')
+  // ラウンド2のあと：「room」の行から部屋の画面を見せる
+  const roomFrom = lineIndex(AFTER_G2, 'room')
   const [talk, setTalk] = useState<{ lines: Line[]; idx: number; then?: () => void } | null>(null)
   const [dialog, setDialog] = useState<{ texts: string[]; idx: number; then?: () => void } | null>(null)
   const [clearFx, setClearFx] = useState(false)
@@ -131,8 +131,22 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chair])
 
+  // 画面を暗くして切り替える（out=暗くしていく / in=明るく戻る）
+  const [fade, setFade] = useState<'out' | 'in' | null>(null)
   const nextTalk = () => {
-    if (!talk) return
+    if (!talk || fade) return
+    // 「ラウンド3に進みましょう」の次から部屋の画面：暗くして切り替え、下のボタンも出す
+    if (talk.lines === AFTER_G2 && roomFrom >= 0 && talk.idx + 1 === roomFrom) {
+      const next = { ...talk, idx: talk.idx + 1 }
+      setFade('out')
+      setTimeout(() => {
+        setStep('room')
+        setTalk(next)
+        setFade('in')
+        setTimeout(() => setFade(null), 1200)
+      }, 600)
+      return
+    }
     if (talk.idx + 1 < talk.lines.length) return setTalk({ ...talk, idx: talk.idx + 1 })
     setTalk(null)
     talk.then?.()
@@ -168,9 +182,31 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
 
   // ---------- エリア編集（?debug=true） ----------
   const [editing, setEditing] = useState(false)
+  const [debugMenu, setDebugMenu] = useState(false)
 
   const line = talk?.lines[talk.idx]
   const busy = !!talk || !!dialog || clearFx
+
+  // ラウンド2のあと「room」の行からは、まだ step が g2 のままでも、部屋の画面に切り替える
+  const showRoom = word.step === 'room' || (talk?.lines === AFTER_G2 && roomFrom >= 0 && talk.idx >= roomFrom)
+  // お題は「ワードはこちら。」（theme）の行で出す。それより前の行では、お題の場所だけ空けておく
+  const themeFrom = lineIndex(AFTER_G2, 'theme')
+  const themeShown = !(talk?.lines === AFTER_G2 && themeFrom >= 0 && talk.idx < themeFrom)
+  const roomView = (
+    <div className="word-room">
+      <div className="word-head">
+        <div className={`word-theme${themeShown ? ' is-pop' : ''}`} style={themeShown ? undefined : { visibility: 'hidden' }}>
+          お題<b>{THEME}</b>
+        </div>
+        <div className="word-sub">{word.chairTold ? CHAIR_GOAL : ROOM_GOAL}</div>
+      </div>
+      <div className="word-field">
+        <div className="word-stage" style={{ aspectRatio: ASPECT[3] }}>
+          <img className="hide-bg" src={st3GameImage(3)} alt="" />
+        </div>
+      </div>
+    </div>
+  )
 
   let view: ReactNode
   if (editing && playing) {
@@ -189,6 +225,8 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         onClose={() => setEditing(false)}
       />
     )
+  } else if (showRoom) {
+    view = roomView
   } else if (playing) {
     view = (
       <WordBoard
@@ -203,36 +241,23 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         onClear={onClear}
       />
     )
-  } else if (word.step === 'room' || (talk?.lines === AFTER_G2 && talk.idx >= ROOM_FROM)) {
-    view = (
-      <div className="word-room">
-        <div className="word-head">
-          <div className="word-theme">
-            お題<b>{THEME}</b>
-          </div>
-          <div className="word-sub">{word.chairTold ? CHAIR_GOAL : ROOM_GOAL}</div>
-        </div>
-        <div className="word-field">
-          <div className="word-stage" style={{ aspectRatio: ASPECT[3] }}>
-            <img className="hide-bg" src={st3GameImage(3)} alt="" />
-          </div>
-        </div>
-      </div>
-    )
   } else {
     // ルール説明中は1ゲーム目の画面を見せておく（触れない）。見本のワードを上に出す
-    const demo = word.step === 'rule' && talk?.lines === RULE ? RULE_DEMO[talk.idx] : undefined
+    const demo = word.step === 'rule' && talk?.lines === RULE ? RULE_DEMO[RULE[talk.idx]?.id ?? ''] : undefined
     view = (
       <div className="word-room">
-        {demo && (
-          <div className="word-head" key={demo.word}>
-            <div className="word-label">見本</div>
-            <div className="word-prompt">
-              <small>{demo.label}</small>
-              <b>{demo.word}</b>
+        {/* 見本が無いときも、見本の分の高さは空けておく（背景がずれないように） */}
+        <div className="word-head">
+          {demo && (
+            <div className="word-demo" key={demo.word}>
+              <div className="word-label">見本</div>
+              <div className="word-prompt">
+                <small>{demo.label}</small>
+                <b>{demo.word}</b>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <div className="word-field">
           <div className="word-stage" style={{ aspectRatio: ASPECT[1] }}>
             <img className="hide-bg" src={st3GameImage(1)} alt="" />
@@ -247,11 +272,36 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
       {view}
 
 
+      {/* ?debug=true の隠しメニュー（左上の角を押すと開く）：エリア編集・強制クリア */}
       {debug && playing && !busy && (
-        <button className="hide-edit-btn" onClick={() => setEditing((e) => !e)}>
-          {editing ? 'ゲームに戻る' : 'エリア編集'}
-        </button>
+        <div className="debug-hidden">
+          <button className="debug-hidden-tap" aria-label="デバッグメニュー" onClick={() => setDebugMenu((o) => !o)} />
+          {debugMenu && (
+            <div className="debug-hidden-menu">
+              <button
+                onClick={() => {
+                  setEditing((e) => !e)
+                  setDebugMenu(false)
+                }}
+              >
+                {editing ? 'ゲームに戻る' : 'エリア編集'}
+              </button>
+              <button
+                disabled={editing}
+                onClick={() => {
+                  setDebugMenu(false)
+                  onClear()
+                }}
+              >
+                強制クリア
+              </button>
+            </div>
+          )}
+        </div>
       )}
+
+      {fade &&
+        overlay(<div className={fade === 'out' ? 'fade-to-black' : 'fade-black is-quick'} />)}
 
       {clearFx && (
         <div className="word-clear">
@@ -266,7 +316,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
         overlay(
           <>
             <div className="hide-catch" onClick={nextTalk} />
-            <GameTalk key={`${talk?.lines[0]?.text}${talk?.idx}`} line={line} compact={shopOpen} />
+            <GameTalk line={line} compact={shopOpen} low={!showRoom} />
           </>,
         )}
 
@@ -294,6 +344,11 @@ interface BoardProps {
   paused: boolean
   onClear: () => void
 }
+
+/** 丸の当たり判定の広さ（見えている丸の半径に対する倍率） */
+const HIT_SCALE = 1.3
+/** 指が離れても、押さえたままとみなす時間 */
+const GRACE_MS = 1500
 
 /**
  * 押さえてワードの盤面。指（ポインター）がどの丸に乗っているかを数えて判定する。
@@ -325,6 +380,7 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
   }, [flash])
 
   const go = (i: number) => {
+    ghosts.current = []
     idxRef.current = i
     setIdx(i)
   }
@@ -335,13 +391,29 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
     const r = el.getBoundingClientRect()
     const px = ((clientX - r.left) / r.width) * 100
     const py = ((clientY - r.top) / r.height) * 100
-    // 丸（楕円）の中か
-    const a = areasRef.current.find((a) => {
+    // 丸（楕円）の中か。指で押さえやすいよう、見えている丸より広く取る。重なるときは中心に近い方
+    let best: { id: string; d: number } | null = null
+    for (const a of areasRef.current) {
       const dx = (px - (a.x + a.w / 2)) / (a.w / 2)
       const dy = (py - (a.y + a.h / 2)) / (a.h / 2)
-      return dx * dx + dy * dy <= 1
-    })
-    return a?.id ?? null
+      const d = dx * dx + dy * dy
+      if (d <= HIT_SCALE * HIT_SCALE && (!best || d < best.d)) best = { id: a.id, d }
+    }
+    return best?.id ?? null
+  }
+
+  // 指が離れた（丸から外れた）丸。GRACE_MS のあいだは、まだ押さえているものとして「離れてない」判定に数える
+  const ghosts = useRef<{ id: string; until: number }[]>([])
+  const lose = (id: string | null | undefined) => {
+    if (!id) return
+    ghosts.current.push({ id, until: Date.now() + GRACE_MS })
+    setTimeout(evaluate, GRACE_MS + 30)
+  }
+  /** その丸に指が戻ってきたら、待っていた分を1つ消す */
+  const regain = (id: string | null) => {
+    if (!id) return
+    const i = ghosts.current.findIndex((g) => g.id === id)
+    if (i >= 0) ghosts.current.splice(i, 1)
   }
 
   const evaluate = () => {
@@ -352,6 +424,14 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
     for (const id of fingers.current.values()) {
       const l = id ? letterOf.get(id) : undefined
       if (l) counts.set(l, (counts.get(l) ?? 0) + 1)
+    }
+    // 離れたばかりの指（猶予のあいだ）を足した数。「離れてない」の判定だけに使う
+    const now = Date.now()
+    ghosts.current = ghosts.current.filter((g) => g.until > now)
+    const withGrace = new Map(counts)
+    for (const g of ghosts.current) {
+      const l = letterOf.get(g.id)
+      if (l) withGrace.set(l, (withGrace.get(l) ?? 0) + 1)
     }
     const i = idxRef.current
     const target = bag(words[i])
@@ -371,7 +451,7 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
     const cur = bag(words[i - 1])
     for (const [l, n] of cur) {
       const keep = Math.min(n, target.get(l) ?? 0)
-      if ((counts.get(l) ?? 0) < keep) {
+      if ((withGrace.get(l) ?? 0) < keep) {
         go(0)
         setFlash({ kind: 'miss', n: Date.now() })
         return
@@ -381,6 +461,8 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
 
   const down = (e: React.PointerEvent) => {
     e.preventDefault()
+    // クリアしたら、もう背景のエリアは押せない
+    if (done.current) return
     if (debug && e.pointerType === 'mouse') {
       // クリックで置く・外す。Shift+クリックは同じ丸にもう1本置く（トーストの「ト」用）
       const id = hit(e.clientX, e.clientY)
@@ -396,25 +478,37 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
     } catch {
       /* 取れなくても判定はできる */
     }
-    fingers.current.set(`p${e.pointerId}`, hit(e.clientX, e.clientY))
+    const id = hit(e.clientX, e.clientY)
+    regain(id)
+    fingers.current.set(`p${e.pointerId}`, id)
     evaluate()
   }
   const move = (e: React.PointerEvent) => {
+    if (done.current) return
     const k = `p${e.pointerId}`
     if (!fingers.current.has(k)) return
     const id = hit(e.clientX, e.clientY)
-    if (fingers.current.get(k) === id) return
+    const before = fingers.current.get(k)
+    if (before === id) return
+    // 丸の外へ出ただけなら、少しのあいだは押さえている扱い。別の丸に乗ったら、その丸で待っていた分を消す
+    if (!id) lose(before)
+    else regain(id)
     fingers.current.set(k, id)
     evaluate()
   }
   const up = (e: React.PointerEvent) => {
-    if (fingers.current.delete(`p${e.pointerId}`)) evaluate()
+    const k = `p${e.pointerId}`
+    const before = fingers.current.get(k)
+    if (fingers.current.delete(k)) {
+      lose(before)
+      evaluate()
+    }
   }
 
   const cleared = idx >= words.length
   const step = Math.min(idx, words.length - 1)
   const success = Math.max(0, Math.min(idx, words.length) - 1)
-  const heldSet = new Set(held)
+  const heldSet = new Set(cleared ? [] : held)
 
   return (
     <div className="word-room">
@@ -446,7 +540,7 @@ export function WordBoard({ label, set, areas, image, aspect, debug, paused, onC
       </div>
       <div className="word-field">
         <div
-          className="word-stage is-play"
+          className={`word-stage is-play${cleared ? ' is-done' : ''}`}
           ref={stageRef}
           style={{ aspectRatio: aspect }}
           onPointerDown={down}
