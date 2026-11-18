@@ -10,18 +10,20 @@ import { useKeyboxSettings } from '../keybox/settings'
 import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
 import { isGame1LoseCart } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
+import { SCENE_NODES, sceneIndex } from '../sceneProgress'
 import { DEFAULT_TEAM, progressLabel } from '../types'
 
-/** 進捗の見た目。ステージが揃うまでは、全チーム同じ飾り */
-const PROGRESS_NODES = ['lg', 'sm', 'sm', 'lg'] as const
-
-function ProgressOrnament() {
+/** 進捗バー：シーンジャンプの行き先ごとに菱形をひとつ。いまの位置までを塗る */
+function ProgressOrnament({ index }: { index: number }) {
   return (
     <div className="progress-track" aria-hidden>
-      {PROGRESS_NODES.map((size, i) => (
-        <span key={i} className="progress-step">
-          <i className={`progress-node is-${size}`} />
-          <i className="progress-bar" />
+      {SCENE_NODES.map((n, i) => (
+        <span key={n.label} className="progress-step">
+          {i > 0 && <i className={`progress-bar${i <= index ? ' is-done' : ''}`} />}
+          <i
+            className={`progress-node is-${n.big ? 'lg' : 'sm'}${i < index ? ' is-done' : ''}${i === index ? ' is-now' : ''}`}
+            title={n.label}
+          />
         </span>
       ))}
     </div>
@@ -120,7 +122,7 @@ export default function StaffScreen() {
                     <span className="order-none">注文なし</span>
                   )}
                 </div>
-                <ProgressOrnament />
+                <ProgressOrnament index={sceneIndex(t)} />
               </div>
               <div className="staff-row-side">
                 <div className={`lock-state ${t.locked ? 'locked' : 'open'}`}>{t.locked ? 'ロック中' : '解除中'}</div>
