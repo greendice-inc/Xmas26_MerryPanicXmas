@@ -119,8 +119,8 @@ export function sockKeyOfItems(items: { id: string; qty: number }[], products: P
 
 export const MAX_CART = 3
 
-/** ステージ1で、勝負に負けるために注文する3つ（王冠・タンバリン・フラフープ） */
-const GAME1_LOSE_IDS = ['game1-1', 'game1-2', 'game1-5']
+/** ステージ1で、勝負に負けるために注文する2つ（タンバリン・フラフープ） */
+const GAME1_LOSE_IDS = ['game1-2', 'game1-5']
 
 export function isGame1LoseCart(items: { id: string; qty: number }[]): boolean {
   const ids = items.flatMap((i) => Array.from({ length: i.qty }, () => i.id)).sort()
@@ -145,7 +145,7 @@ export function stage3OrderedQty(): { id: string; qty: number }[] {
   return STAGE3_IDS.map((id) => ({ id, qty: 1 }))
 }
 
-/** そのステージの正しい注文か。ステージ3以外は、ステージ1の3つ */
+/** そのステージの正しい注文か。ステージ3以外は、ステージ1の2つ */
 export function isCorrectCart(stage: number, items: { id: string; qty: number }[]): boolean {
   return stage === 3 ? isStage3Cart(items) : isGame1LoseCart(items)
 }

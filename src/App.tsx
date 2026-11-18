@@ -61,7 +61,7 @@ function PlayerHiddenMenu({ team, onReset, onReconnect }: { team: number; onRese
       fullscreenToggle
       locked={doc.locked}
       onJump={({ stage, phase, step }) => {
-        // ステージ1の注文は子供部屋で行う。それより後のシーンでは、正しい3点がすでに消費されている
+        // ステージ1の注文は子供部屋で行う。それより後のシーンでは、正しい2点がすでに消費されている
         const pastStage1 = phase === 'end' || stage > 1
         // ステージ2：見つけた人数に合わせて、案内の済み具合・記録・検索済みリストを揃える
         const found = step === 'amy' ? 1 : step === 'jimmy' ? 2 : step === 'tommy' ? 3 : 0

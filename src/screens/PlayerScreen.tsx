@@ -24,7 +24,7 @@ import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_
 import { adultWaitMs, setAdultSkip } from '../adultWait'
 import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../types'
 
-/** 正しい3点を注文してから、届いたポップアップが出るまで */
+/** 正しい注文をしてしてから、届いたポップアップが出るまで */
 /** 注文から、商品が届くまで。「注文が確定しました」を自動で閉じる時間（Santazon の CONFIRM_MS）より、少し長くする */
 const DELIVER_MS = 3500
 /** ステージ4 ROUND2：ナゾを開いて少したってから出す案内 */
@@ -248,7 +248,7 @@ export default function PlayerScreen({ team }: { team: number }) {
     advancing.current = false
   }, [doc.stage, doc.phase])
 
-  // 正しい注文（ステージ1は王冠・タンバリン・フラフープ、ステージ3はペンギン・ダチョウ）は、数秒後に自動で届ける
+  // 正しい注文（ステージ1はタンバリン・フラフープ、ステージ3はペンギン・ダチョウ）は、数秒後に自動で届ける
   useEffect(() => {
     const order = doc.order
     if (!order || order.status !== 'ordered' || !correctCart(order.items)) return
