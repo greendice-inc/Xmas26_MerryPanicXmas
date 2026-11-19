@@ -8,24 +8,30 @@ import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
 import { toHex2 } from '../keybox/protocol'
 import { useKeyboxSettings } from '../keybox/settings'
 import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
-import { isGame1LoseCart } from '../santazon/products'
+import { isGame1LoseCart, ORDER_STAGES } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { SCENE_NODES, sceneIndex } from '../sceneProgress'
-import { DEFAULT_TEAM, progressLabel } from '../types'
+import { DEFAULT_TEAM, type TeamDoc } from '../types'
 
-/** 進捗バー：シーンジャンプの行き先ごとに菱形をひとつ。いまの位置までを塗る */
-function ProgressOrnament({ index }: { index: number }) {
+/** 進捗バー：ステージごとに丸をひとつ（1〜5・END）。いまのステージまでを塗り、いまのシーン名を右に出す */
+/** いまのシーン名（例：わなげ 会話）。未開始は「未開始」 */
+function sceneName(t: TeamDoc): string {
+  const i = sceneIndex(t)
+  return i >= 0 ? SCENE_NODES[i].label : '未開始'
+}
+const STAGE_DOTS = ['1', '2', '3', '4', '5', 'END']
+function ProgressOrnament({ team }: { team: TeamDoc }) {
+  const now = !team.started ? -1 : team.phase === 'end' ? 5 : Math.min(Math.max(team.stage - 1, 0), 4)
   return (
-    <div className="progress-track" aria-hidden>
-      {SCENE_NODES.map((n, i) => (
-        <span key={n.label} className="progress-step">
-          {i > 0 && <i className={`progress-bar${i <= index ? ' is-done' : ''}`} />}
-          <i
-            className={`progress-node is-${n.big ? 'lg' : 'sm'}${i < index ? ' is-done' : ''}${i === index ? ' is-now' : ''}`}
-            title={n.label}
-          />
-        </span>
-      ))}
+    <div className="progress-track">
+      <span className="progress-dots" aria-hidden>
+        {STAGE_DOTS.map((d, i) => (
+          <span key={d} className="progress-step">
+            {i > 0 && <i className={`progress-bar${i <= now ? ' is-done' : ''}`} />}
+            <i className={`progress-node is-lg${i < now ? ' is-done' : ''}${i === now ? ' is-now' : ''}`} title={d} />
+          </span>
+        ))}
+      </span>
     </div>
   )
 }
@@ -91,24 +97,21 @@ export default function StaffScreen() {
         {teamNos.map((n) => {
           const t = teamDoc(n)
           const order = t.order
-          const holding = !!order?.stayed
-          const canHold =
-            t.stage === 1 &&
+          // 正解のあと、プレイヤーが待っている間だけ「次へ」を押せる（押すと、プレイヤーに「タップで次のステージに進む」が出る）
+          const canNext =
             t.phase === 'game' &&
+            ORDER_STAGES.includes(t.stage) &&
             !!order &&
             order.status === 'solved' &&
-            isGame1LoseCart(order.items)
-          const remain =
-            canHold && order.proceedAt != null
-              ? Math.max(0, Math.ceil((order.proceedAt - now) / 1000))
-              : null
+            order.proceedAt == null &&
+            !(t.stage === 1 && isGame1LoseCart(order.items))
           return (
             <div className={`staff-row ${t.locked ? 'is-locked' : 'is-open'}`} key={n}>
               <div className="staff-row-body">
                 <div className="staff-row-main">
                   <ConnDot on={isOnline(presence[`player-${n}`], now)} />
                   <div className="team-no">チーム {n}</div>
-                  <div className="progress">{progressLabel(t)}</div>
+                  <div className="progress">{sceneName(t)}</div>
                   {t.order ? (
                     <>
                       <span className={`order-status ${t.order.status}`}>
@@ -122,27 +125,26 @@ export default function StaffScreen() {
                     <span className="order-none">注文なし</span>
                   )}
                 </div>
-                <ProgressOrnament index={sceneIndex(t)} />
+                <ProgressOrnament team={t} />
               </div>
               <div className="staff-row-side">
                 <div className={`lock-state ${t.locked ? 'locked' : 'open'}`}>{t.locked ? 'ロック中' : '解除中'}</div>
                 <div className="stay-row">
-                {remain != null && <div className={`stay-count${holding ? ' is-held' : ''}`}>{remain}秒</div>}
-                <button
-                  className="order-ready"
-                  disabled={!canHold}
-                  onClick={() => {
-                    if (!order) return
-                    getBackend()
-                      .set('teams', String(n), {
-                        order: { ...order, stayed: !holding },
-                        updatedAt: Date.now(),
-                      })
-                      .catch(() => {})
-                  }}
-                >
-                  {holding ? '再開' : 'ステイ'}
-                </button>
+                  <button
+                    className="order-ready"
+                    disabled={!canNext}
+                    onClick={() => {
+                      if (!order) return
+                      getBackend()
+                        .set('teams', String(n), {
+                          order: { ...order, proceedAt: Date.now(), stayed: false },
+                          updatedAt: Date.now(),
+                        })
+                        .catch(() => {})
+                    }}
+                  >
+                    次へ
+                  </button>
                 </div>
               </div>
             </div>

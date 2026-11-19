@@ -6,7 +6,7 @@ interface Props<T extends Area> {
   /** Firestore に保存済みの位置を表示しているか */
   saved: boolean
   image: string
-  /** 画像の縦横比（例: '1980 / 1200'） */
+  /** 画像の縦横比（例: '1920 / 1200'） */
   aspect: string
   /** 枠に書く名前 */
   boxLabel: (a: T) => string

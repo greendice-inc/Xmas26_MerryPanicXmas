@@ -20,8 +20,11 @@ import { isCorrectCart, ORDER_STAGES, sockKeyOfItems } from '../santazon/product
 import { useProducts } from '../santazon/useProducts'
 import { useGameLines, useScriptScene } from '../script/scriptData'
 import { hl } from '../components/GameTalk'
-import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_MOOD, ST1_MOOD_AFTER, ST2_MOOD, ST3_MOOD, ST4_MOOD, type Mood } from '../scenario'
-import { adultWaitMs, setAdultSkip } from '../adultWait'
+import RecordsPage from '../components/RecordsPage'
+import { PREVIEW } from '../preview'
+import { ALL_MARK_SCORES } from '../games/MarkGame'
+import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_MOOD, ST2_MOOD, ST3_MOOD, ST4_MOOD, type Mood } from '../scenario'
+import { setAdultSkip } from '../adultWait'
 import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../types'
 
 /** 正しい注文をしてしてから、届いたポップアップが出るまで */
@@ -29,7 +32,8 @@ import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../ty
 const DELIVER_MS = 3500
 /** ステージ4 ROUND2：ナゾを開いて少したってから出す案内 */
 const R2_HINT = 'これまでに発送した際のアイテムとソックスキーは、\n「記録」画面で確認できます。'
-const STAGE1_TASK = 'リンさんを勝たせる。ただし「失格」になってはいけない。'
+const STAGE1_MARK_TASK = 'ゲームに使う５つのマークの得点を特定しよう。'
+const STAGE1_TASK = '失格せずに、リンを勝たせる。'
 
 /** 暗転からのフェードインの長さ（styles.css の .fade-black と合わせる） */
 const FADE_MS = 2500
@@ -52,7 +56,8 @@ export default function PlayerScreen({ team }: { team: number }) {
   // セリフ編集で保存したセリフ（無ければコードのまま）
   const edited = useScriptScene(doc.stage, doc.phase)
   // 「はじめから／つづきから」を選んだか（再接続・リセット後は再び選ばせる）
-  const [entered, setEntered] = useState(false)
+  // プレビュー（?preview）は、入口の「はじめから／つづきから」を出さない
+  const [entered, setEntered] = useState(PREVIEW)
 
   // フタが外れた瞬間に、暗転 → フェードインで会話を始める
   const [fading, setFading] = useState(false)
@@ -152,7 +157,6 @@ export default function PlayerScreen({ team }: { team: number }) {
   const [guideWait, setGuideWait] = useState<GuideFx['wait'] | null>(null)
   // 正解直後、Firestore の反映を待たずにエルフを出すための時刻
   const [localProceedAt, setLocalProceedAt] = useState<number | null>(null)
-  const [now, setNow] = useState(() => Date.now())
   const advancing = useRef(false)
   const stageRef = useRef(doc.stage)
   stageRef.current = doc.stage
@@ -207,8 +211,8 @@ export default function PlayerScreen({ team }: { team: number }) {
         : cart.length
           ? `ソックスキー（カートの中身なら）${sockKeyOfItems(cart, products)}`
           : null
+  // 正解のあと：スタッフが「次へ」を押す（または隠しメニューで進める）まで、エルフが待たせる。押された時刻が proceedAt
   const proceedAt = localProceedAt ?? doc.order?.proceedAt
-  const stayed = !!doc.order?.stayed
   const showGuide =
     loaded &&
     doc.phase === 'game' &&
@@ -216,19 +220,15 @@ export default function PlayerScreen({ team }: { team: number }) {
     !!doc.order &&
     correctCart(doc.order.items) &&
     (doc.order.status === 'solved' || localProceedAt != null)
-  const counting = showGuide && proceedAt != null && proceedAt > now
-  const adultWait = counting || (showGuide && stayed)
-  const adultReady = showGuide && !adultWait
+  const adultWait = showGuide && proceedAt == null
+  const adultReady = showGuide && proceedAt != null
 
   const onSolved = () => {
     if (!doc.order) return
-    const nextProceedAt =
-      ORDER_STAGES.includes(doc.stage) && correctCart(doc.order.items) ? Date.now() + adultWaitMs(doc.stage) : undefined
-    if (nextProceedAt != null) {
-      advancing.current = false
-      setLocalProceedAt(nextProceedAt)
-    }
-    update({ order: { ...doc.order, status: 'solved', proceedAt: nextProceedAt, stayed: false } })
+    advancing.current = false
+    setLocalProceedAt(null)
+    // 正解。スタッフの「次へ」が来るまで待つ（proceedAt なし）
+    update({ order: { ...doc.order, status: 'solved', proceedAt: undefined, stayed: false } })
   }
 
   const goNext = () => {
@@ -276,20 +276,6 @@ export default function PlayerScreen({ team }: { team: number }) {
   }
 
   useEffect(() => {
-    if (!adultWait || proceedAt == null) return
-    // タイマーはわずかに早く鳴ることがあるので、少し遅らせ、時刻も proceedAt 以上にする（早いと待ちのまま止まる）
-    const t = setTimeout(() => setNow(Math.max(Date.now(), proceedAt)), Math.max(0, proceedAt - Date.now()) + 50)
-    return () => clearTimeout(t)
-  }, [adultWait, proceedAt])
-
-  // スタッフのステイで proceedAt が未来に戻ったら、手元の時刻も合わせる
-  useEffect(() => {
-    const remote = doc.order?.proceedAt
-    if (remote == null || remote <= Date.now()) return
-    setLocalProceedAt((local) => (local != null && local >= remote ? local : remote))
-  }, [doc.order?.proceedAt])
-
-  useEffect(() => {
     if (!adultWait) {
       setAdultSkip(null)
       return
@@ -297,7 +283,6 @@ export default function PlayerScreen({ team }: { team: number }) {
     setAdultSkip(() => {
       const at = Date.now()
       setLocalProceedAt(at)
-      setNow(at)
       const order = orderRef.current
       if (order) updateRef.current({ order: { ...order, proceedAt: at, stayed: false } })
     })
@@ -316,6 +301,7 @@ export default function PlayerScreen({ team }: { team: number }) {
       searched: [],
       markCleared: false,
       markSolved: false,
+      markScores: {},
       sockTold: false,
       searchUnlocked: false,
       records: [],
@@ -381,6 +367,12 @@ export default function PlayerScreen({ team }: { team: number }) {
           szTab={szTab}
           onGuide={onGuide}
           onAllFound={() => fadeThen(() => update({ phase: 'clear' }))}
+          onTutorialEnd={(then) =>
+            fadeThen(() => {
+              setShopOpen(false)
+              then()
+            })
+          }
         />
       )
     } else if (doc.stage === WORD_STAGE) {
@@ -442,11 +434,14 @@ export default function PlayerScreen({ team }: { team: number }) {
       const Game = GAMES[doc.stage - 1]
       body = (
         <Game
-          key={`g${doc.stage}-${doc.markSolved ? 's' : ''}`}
+          key={`g${doc.stage}-${doc.markSolved ? 's' : ''}-${doc.enterAt ?? 0}`}
           stage={doc.stage}
           // ステージ1：マークと得点が分かったら、画面はそのままで続きの説明へ
           solved={doc.stage === 1 && !!doc.markSolved}
-          onClear={() => (doc.stage === 1 ? update({ markSolved: true }) : update({ phase: 'clear' }))}
+          scores={doc.markScores}
+          onScore={(id, answer) => update({ markScores: { ...(doc.markScores ?? {}), [id]: answer } })}
+          // 「全部わかったね」のあとは、暗くしてから次のセリフへ
+          onClear={() => fadeThen(() => (doc.stage === 1 ? update({ markSolved: true }) : update({ phase: 'clear' })))}
         />
       )
     }
@@ -490,7 +485,9 @@ export default function PlayerScreen({ team }: { team: number }) {
     (doc.stage === BINGO_STAGE && doc.phase === 'game' && (!bingoRound || !!doc.bingo?.deckIn)) ||
     // LAST は、取り出したあとの会話と警告マークの通知のあいだは注文できない
     (lastStep != null && doc.phase === 'game' && (lastStep === 'extract' || lastStep === 'notice'))
-  const records = (doc.records ?? []).filter((id) => RECORDS[id])
+  // ステージ1のリンのキモチは、マークが始まったときから記録に入る（保存はせず、いまの位置から決める）
+  const markStarted = doc.started && (doc.stage > 1 || doc.phase === 'game' || doc.phase === 'clear' || doc.phase === 'end')
+  const records = [...(markStarted ? ['st1-mood', 'st1-rule'] : []), ...(doc.records ?? [])].filter((id) => RECORDS[id])
   // ステージ4 ROUND1 で発送したアイテムと、ソックスキー（ROUND2 の「番号の法則」のナゾの手がかり）
   const r1Record = (() => {
     const items = (ROUNDS.r1.order ?? []).flatMap((w) => {
@@ -502,7 +499,7 @@ export default function PlayerScreen({ team }: { team: number }) {
   // 「やるべきこと」：そのステージでやること と、子どものキモチ（ハートの代わり）
   const task: { text?: string; mood?: Mood } = (() => {
     if (doc.phase !== 'game') return {}
-    if (doc.stage === 1) return doc.markCleared ? { text: STAGE1_TASK, mood: ST1_MOOD_AFTER } : { mood: ST1_MOOD }
+    if (doc.stage === 1) return doc.markCleared ? { text: STAGE1_TASK } : { text: STAGE1_MARK_TASK }
     if (doc.stage === HIDE_STAGE) return { mood: ST2_MOOD }
     if (doc.stage === WORD_STAGE) return (doc.word?.step ?? 'rule') === 'rule' ? {} : { mood: ST3_MOOD }
     if (doc.stage === BINGO_STAGE) return doc.bingo?.jack ? { mood: ST4_MOOD } : {}
@@ -539,7 +536,7 @@ export default function PlayerScreen({ team }: { team: number }) {
     setSockPressedAt(orderAt)
     setProblemOpen(true)
   }
-  // Santazon の中から押したとき（ステージ4〜）は、Santazon を閉じず、その上にナゾを重ねて開く（ゲーム画面に切り替えない）
+  // Santazon の中から押したときは、Santazon を閉じず、その上にナゾを重ねて開く（ゲーム画面に切り替えない）
   const openProblemOverShop = () => {
     if (!delivered) return
     setArrivedSeenAt(orderAt)
@@ -555,23 +552,21 @@ export default function PlayerScreen({ team }: { team: number }) {
   const sockReady =
     loaded && entered && doc.stage === 1 && doc.phase === 'game' && !!doc.markCleared && !doc.sockTold &&
     delivered && !!doc.order && correctCart(doc.order.items) && (arrivedSeenAt === orderAt || skipArrival)
-  // 「注文が確定しました」の閉じるを押した瞬間に、暗くして santazon を閉じ、届いたら説明を始める（フェード）
+  // 「注文が確定しました」の閉じるを押したら、暗くして（フェード）、santazon を開いたまま、ソックスキーの説明を始める（ゲーム画面には戻さない）
   const [sockFadedAt, setSockFadedAt] = useState<number | null>(null)
   const sockGuide = sockReady && sockFadedAt === orderAt && !blackout
   const onConfirmedClose = () => {
     if (doc.stage !== 1 || doc.phase !== 'game' || doc.sockTold || !doc.order || !correctCart(doc.order.items) || sockFadedAt === orderAt) return
-    fadeThen(() => {
-      setShopOpen(false)
-      setSockFadedAt(orderAt)
-    })
+    fadeThen(() => setSockFadedAt(orderAt))
   }
-  // 再読み込みなどで santazon が開いていないときは、押す場面がないので、そのまま始める
+  // 再読み込みなどで santazon が開いていないときは、santazon を開いてから、最初のセリフ（「なるほど。それなら確かに〜」）を始める
   useEffect(() => {
-    if (sockReady && !shopOpen && !blackout && sockFadedAt !== orderAt) setSockFadedAt(orderAt)
+    if (sockReady && !shopOpen && !blackout && sockFadedAt !== orderAt) {
+      setSzTab('list')
+      setShopOpen(true)
+      setSockFadedAt(orderAt)
+    }
   }, [sockReady, shopOpen, blackout, sockFadedAt, orderAt])
-  useEffect(() => {
-    if (sockGuide) setShopOpen(false)
-  }, [sockGuide])
   // ステージ1の案内：santazon / ナゾの画面の上で話している途中に、その画面が閉じてしまったら開き直す
   // （開発中の再読み込みで、台詞の位置は残るのに「マーク当て中は閉じる」が走り直す、など）
   const reopenForGuide = (w: 'shop' | 'sock') => {
@@ -611,7 +606,7 @@ export default function PlayerScreen({ team }: { team: number }) {
                 // 取り出し依頼ボタンはステージ4から、ずっと出す
                 onRequest={doc.stage >= BINGO_STAGE ? onRequest : undefined}
                 // 届いた注文のナゾ（閉じていても、ここから開き直せる）
-                onOpenProblem={doc.stage >= BINGO_STAGE ? openProblemOverShop : openProblem}
+                onOpenProblem={openProblemOverShop}
                 sockGlow={sockGlow}
                 requestGlow={requestGlow}
                 onConfirmedClose={onConfirmedClose}
@@ -724,33 +719,18 @@ export default function PlayerScreen({ team }: { team: number }) {
             </div>
           )}
           {!talking && recordsOpen && (
-            <div className="modal-back" onClick={() => setRecordsOpen(false)}>
-              <div className="modal records" onClick={(e) => e.stopPropagation()}>
-                <h2>記録</h2>
-                <div className="records-list">
-                  {records.map((id) =>
-                    id === 'st4-r1' ? (
-                      <figure key={id} className="records-text">
-                        <figcaption>{RECORDS[id].title}</figcaption>
-                        {r1Record.map((l, i) => (
-                          <p key={i}>{l}</p>
-                        ))}
-                      </figure>
-                    ) : (
-                      <figure key={id}>
-                        <img src={RECORDS[id].image} alt="" />
-                        <figcaption>{RECORDS[id].title}</figcaption>
-                      </figure>
-                    ),
-                  )}
-                </div>
-                <button onClick={() => setRecordsOpen(false)}>閉じる</button>
-              </div>
-            </div>
+            <RecordsPage
+              unlocked={doc.phase === 'end' ? GAME_COUNT : doc.stage}
+              records={records}
+              textOf={{ 'st1-mood': ST1_MOOD.lines.map((l) => l.text), 'st4-r1': r1Record }}
+              iconOf={{ 'st1-mood': ST1_MOOD.icon }}
+              markScores={doc.markScores ?? (doc.markSolved || doc.stage > 1 ? ALL_MARK_SCORES : {})}
+              onClose={() => setRecordsOpen(false)}
+            />
           )}
           {!talking && taskOpen && (
             <div className="modal-back" onClick={() => setTaskOpen(false)}>
-              <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal task-modal">
                 <h2>やるべきこと</h2>
                 {task.text && <p className="task-text">{task.text}</p>}
                 {/* 子どものキモチ（前はハートのボタンで見ていたもの） */}
@@ -768,7 +748,7 @@ export default function PlayerScreen({ team }: { team: number }) {
                     </div>
                   </div>
                 )}
-                <button onClick={() => setTaskOpen(false)}>閉じる</button>
+                
               </div>
             </div>
           )}

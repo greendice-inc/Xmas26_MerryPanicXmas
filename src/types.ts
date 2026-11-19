@@ -13,6 +13,8 @@ export function presenceKey(i: Identity): string {
 
 export interface PresenceDoc {
   lastSeen: number
+  /** この端末が、lastSeen の値が変わったのを見た時刻（保存はしない。時計のずれを避けるため） */
+  seenAt?: number
 }
 
 /** novel=会話 / game=ゲーム / clear=クリア後のお礼 / end=エンディング */
@@ -59,6 +61,8 @@ export interface TeamDoc {
   resetAt?: number
   /** シーンジャンプした時刻（変化したらプレイヤーは画面に入る） */
   enterAt?: number
+  /** ステージ1：答えが合ったマークと得点（記録の「マークのルール」に出す） */
+  markScores?: Record<string, number>
   /** Santazon の注文（なければ null） */
   order: Order | null
   /** これまでに注文した数（在庫の計算用） */

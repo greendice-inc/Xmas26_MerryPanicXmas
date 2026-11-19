@@ -552,8 +552,10 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
 
       {confirmed && (
         <div className="sz-dialog-back" onClick={closeConfirmed}>
-          <div className="sz-dialog" onClick={(e) => e.stopPropagation()}>
-            <p>注文が確定しました。商品が届くまでしばらくお待ちください。</p>
+          <div className="sz-dialog sz-confirmed" onClick={(e) => e.stopPropagation()}>
+            <p>
+              注文が確定しました。<br/>商品が届くまでお待ちください。
+            </p>
             <button className="sz-btn sz-yellow" onClick={closeConfirmed}>閉じる</button>
           </div>
         </div>

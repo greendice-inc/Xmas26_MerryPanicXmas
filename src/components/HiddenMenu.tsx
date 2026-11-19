@@ -5,54 +5,68 @@ import type { JumpTarget } from '../types'
 /** 隠しメニューの判定エリア（画面左上の一辺 px） */
 const SECRET_ZONE = 220
 
-/** ステージごとのゲーム中の行き先（無ければ「ゲーム」ひとつ） */
-const JUMP_GAMES: Record<number, { label: string; step?: JumpTarget['step'] }[]> = {
-  1: [
-    { label: 'マーク', step: 'quiz' },
-    { label: '輪投げ', step: 'order' },
-  ],
-  2: [
-    { label: '開始', step: 'start' },
-    { label: 'アミー後', step: 'amy' },
-    { label: 'ジミー後', step: 'jimmy' },
-    { label: 'トミー後', step: 'tommy' },
-  ],
-  3: [
-    { label: '説明', step: 'rule' },
-    { label: 'ゲーム1', step: 'g1' },
-    { label: 'ゲーム2', step: 'g2' },
-    { label: 'お題', step: 'room' },
-  ],
-  4: [
-    { label: '説明', step: 'rule' },
-    { label: 'ROUND1', step: 'r1' },
-    { label: 'ROUND2', step: 'r2' },
-  ],
-  5: [
-    { label: '開始', step: 'basket' },
-    { label: '取り出し後', step: 'balls' },
-    { label: '重要通知', step: 'notice' },
-    { label: 'マスター後', step: 'super' },
-  ],
+/** ステージごとの名前と、ゲーム中の行き先（会話は全ステージの先頭に付く）。phase を書いたものは、ゲームではなくそのシーンへ */
+type JumpBtn = { label: string; step?: JumpTarget['step']; phase?: 'clear' }
+const JUMP_STAGES: Record<number, { name: string; buttons: JumpBtn[] }> = {
+  1: {
+    name: 'わなげ',
+    buttons: [{ label: 'マーク', step: 'quiz' }, { label: '輪投げ', step: 'order' }, { label: 'END', phase: 'clear' }],
+  },
+  2: {
+    name: 'かくれんぼ',
+    buttons: [
+      { label: '一人目', step: 'start' },
+      { label: '二人目', step: 'amy' },
+      { label: '三人目', step: 'jimmy' },
+      { label: 'END', step: 'tommy' },
+    ],
+  },
+  3: {
+    name: 'ツイスター',
+    buttons: [
+      { label: 'T1', step: 'g1' },
+      { label: 'T2', step: 'g2' },
+      { label: 'T3', step: 'room' },
+      { label: 'END', phase: 'clear' },
+    ],
+  },
+  4: {
+    name: 'ビンゴ',
+    buttons: [{ label: 'B1', step: 'r1' }, { label: 'B2', step: 'r2' }, { label: 'END', phase: 'clear' }],
+  },
+  5: {
+    name: 'エントツ',
+    buttons: [
+      { label: 'サッカー', step: 'basket' },
+      { label: '取り出し', step: 'extract' },
+      { label: '煙突', step: 'balls' },
+      { label: '緊急', step: 'notice' },
+      { label: 'ラスト', step: 'super' },
+    ],
+  },
 }
 
 interface Props {
+  /** メニューの見出しに添える名前（例：チーム 3） */
+  label?: string
   onReset: () => void
   onReconnect: () => void
   /** 指定時のみ「ロックを外す」ボタンを表示（プレイヤー用） */
   onUnlock?: () => void
+  /** 指定時のみ「ゲームを強制クリア」ボタンを表示（ゲーム中のプレイヤー用） */
+  onForceClear?: () => void
   /** 指定時のみ「シーンジャンプ」ボタンを表示（プレイヤー用） */
   onJump?: (target: JumpTarget) => void
   /** false のときは「ロックを外す」を出さない（ロックされていないとき） */
   locked?: boolean
   /** true のときフルスクリーン切り替えボタンを表示 */
   fullscreenToggle?: boolean
-  /** 正解直後の30秒待ちのときだけ。押すとその待ちを飛ばす */
+  /** 正解直後、スタッフの「次へ」を待っているときだけ。押すと、スタッフが押したのと同じに進む */
   onSkipWait?: () => void
 }
 
 /** 画面左上を連続タップするとメニューが出る（トップ画面以外で配置する） */
-export default function HiddenMenu({ onReset, onReconnect, onUnlock, onJump, locked, fullscreenToggle, onSkipWait }: Props) {
+export default function HiddenMenu({ label, onReset, onReconnect, onUnlock, onJump, onForceClear, locked, fullscreenToggle, onSkipWait }: Props) {
   const taps = useRef<number[]>([])
   const [open, setOpen] = useState(false)
   const [jumping, setJumping] = useState(false)
@@ -111,15 +125,15 @@ export default function HiddenMenu({ onReset, onReconnect, onUnlock, onJump, loc
               <div className="jump-grid">
                 {Array.from({ length: GAME_COUNT }, (_, i) => i + 1).map((stage) => (
                   <div className="jump-row" key={stage}>
-                    <span>{`ステージ${stage}`}</span>
+                    <span>{JUMP_STAGES[stage]?.name}</span>
                     <button onClick={() => jump({ stage, phase: 'novel' })}>会話</button>
-                    {(JUMP_GAMES[stage] ?? [{ label: 'ゲーム' }]).map((g) => (
-                      <button key={g.label} onClick={() => jump({ stage, phase: 'game', step: g.step })}>{g.label}</button>
+                    {(JUMP_STAGES[stage]?.buttons ?? [{ label: 'ゲーム' }]).map((g: JumpBtn) => (
+                      <button key={g.label} onClick={() => jump({ stage, phase: g.phase ?? 'game', step: g.step })}>{g.label}</button>
                     ))}
                   </div>
                 ))}
                 <div className="jump-row">
-                  <span>エンディング</span>
+                  <span>クリア後</span>
                   <button onClick={() => jump({ stage: GAME_COUNT, phase: 'end' })}>会話</button>
                 </div>
               </div>
@@ -127,7 +141,7 @@ export default function HiddenMenu({ onReset, onReconnect, onUnlock, onJump, loc
             </div>
           ) : (
           <div className="modal">
-            <h2>メニュー</h2>
+            <h2>{label ? `メニュー（${label}）` : 'メニュー'}</h2>
             <button onClick={onReset}>トップへ戻る</button>
             {onUnlock && locked !== false && (
               <button
@@ -140,6 +154,16 @@ export default function HiddenMenu({ onReset, onReconnect, onUnlock, onJump, loc
               </button>
             )}
             {onJump && <button onClick={() => setJumping(true)}>シーンジャンプ</button>}
+            {onForceClear && (
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  onForceClear()
+                }}
+              >
+                ゲームを強制クリア
+              </button>
+            )}
             {onSkipWait && (
               <button
                 onClick={() => {
@@ -147,7 +171,7 @@ export default function HiddenMenu({ onReset, onReconnect, onUnlock, onJump, loc
                   onSkipWait()
                 }}
               >
-                待ち時間をスキップ
+                次へ進む（スタッフの「次へ」の代わり）
               </button>
             )}
             {fullscreenToggle && (

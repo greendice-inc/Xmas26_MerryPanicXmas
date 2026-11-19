@@ -66,7 +66,7 @@ const rin = (text: string, emotion: Emotion = '楽', speaker = 'リン'): NovelL
 export const ST1_MOOD: Mood = {
   icon: characterImage('Stage1', '楽'),
   name: 'リン',
-  lines: [{ text: 'わなげはとっても得意！絶対に勝てるはず！' }],
+  lines: [{ text: '輪投げはとっても得意！絶対に勝てるはず！' }],
 }
 export const ST1_MOOD_AFTER: Mood = {
   icon: characterImage('Stage1', '喜'),
@@ -122,11 +122,15 @@ export const st2GameImage = (found: number) => `${BASE}BG/Stage2/st2_ゲーム�
 /** ダミー（マネキン）の画像。専用の画像ができるまでは商品カードを使う */
 export const MANNEQUIN_IMAGE = `${BASE}slide/st2/card.png`
 
-/** 「記録」から見返せる画像 */
-export const RECORDS: Record<string, { title: string; image: string }> = {
-  'st2-card': { title: 'マネキンとセーターの商品カード', image: `${BASE}slide/st2/card.png` },
+/** 「記録」から見返せる画像。stage は、どのステージのタブに載せるか */
+export const RECORDS: Record<string, { stage: number; title: string; image: string }> = {
+  // ステージ1 マークのリンのキモチ（中身は ST1_MOOD。画像なし）
+  'st1-mood': { stage: 1, title: 'リンのキモチ', image: '' },
+  // ステージ1 マークのルール（中身は RecordsPage で作る。画像なし）
+  'st1-rule': { stage: 1, title: 'リングデマーク', image: '' },
+  'st2-card': { stage: 2, title: 'マネキンとセーターの商品カード', image: `${BASE}slide/st2/card.png` },
   // ステージ4 ROUND1 で発送したアイテムとソックスキー（中身はゲーム画面で作る。画像なし）
-  'st4-r1': { title: 'ROUND1で発送したアイテムとソックスキー', image: '' },
+  'st4-r1': { stage: 4, title: 'ROUND1で発送したアイテムとソックスキー', image: '' },
 }
 
 /** ステージ2：三人のキモチ。誰がどの名前かはわからないので、アイコンはシルエットのまま */

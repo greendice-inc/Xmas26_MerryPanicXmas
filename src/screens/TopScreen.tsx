@@ -20,10 +20,10 @@ export default function TopScreen({
   const now = useNow()
   const live = (i: Identity) => isOnline(presence[presenceKey(i)], now)
 
-  const tile = (i: Identity, className: string, children: React.ReactNode) => {
+  const tile = (i: Identity, className: string, children: React.ReactNode, lockWhenOnline = false) => {
     const on = live(i)
     return (
-      <button key={`${i.role}-${i.id}`} className={`${className}${on ? ' is-online' : ''}`} onClick={() => onSelect(i)}>
+      <button key={`${i.role}-${i.id}`} className={`${className}${on ? ' is-online' : ''}`} disabled={lockWhenOnline && on} onClick={() => onSelect(i)}>
         {children}
         {on && <span className="tile-live">起動中</span>}
       </button>
@@ -34,7 +34,7 @@ export default function TopScreen({
     <div className="screen top">
       <header className="top-header">
         <div className="top-lead">
-          <div className="top-legend"><span className="tile-live">起動中</span> は、すでに別の端末で使われています</div>
+          <div className="top-legend"><span className="tile-live">起動中</span> は、すでに別の端末で使われています（チーム番号とマスターは選べません）</div>
           <div className="top-updated">更新 {__UPDATED_AT__}</div>
         </div>
         <div className="top-debug-links">
@@ -48,7 +48,7 @@ export default function TopScreen({
         <section className="card">
           <h2 className="section-title">管理</h2>
           <div className="tile-row">
-            {tile({ role: 'master', id: 0 }, 'tile tile-wide', 'マスター')}
+            {tile({ role: 'master', id: 0 }, 'tile tile-wide', 'マスター', true)}
             {tile({ role: 'staff', id: 0 }, 'tile tile-wide', 'スタッフ')}
           </div>
         </section>
@@ -65,6 +65,7 @@ export default function TopScreen({
                 <span className="tile-cap">TEAM</span>
                 <span className="tile-num">{n}</span>
               </>,
+              true,
             ),
           )}
         </div>

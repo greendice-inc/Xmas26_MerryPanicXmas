@@ -31,24 +31,64 @@ export default function TenKey({
           </span>
         ))}
       </div>
+      <TenKeyPad
+        onKey={put}
+        onDelete={() => setValue((v) => v.slice(0, -1))}
+        onOk={submit}
+        okDisabled={value.length !== length}
+        okLabel={okLabel}
+      />
+    </div>
+  )
+}
+
+/**
+ * テンキーのボタン部分だけ（電話と同じ3列：1〜9、下の段が ⌫・0・OK）。
+ * ソックスキーのナゾも、マークも、この部品を使うので、大きさと見た目は同じになる
+ */
+export function TenKeyPad({
+  onKey,
+  onDelete,
+  onOk,
+  okDisabled,
+  okLabel = 'OK',
+  disabled,
+  deleteProps,
+  className = '',
+}: {
+  onKey: (d: string) => void
+  onDelete: () => void
+  onOk: () => void
+  okDisabled?: boolean
+  okLabel?: string
+  /** true のとき、数字・⌫・OK のすべてを押せなくする */
+  disabled?: boolean
+  /** ⌫ に足す指定（長押しなど） */
+  deleteProps?: React.ButtonHTMLAttributes<HTMLButtonElement>
+  className?: string
+}) {
+  return (
+    <div className={`tenkey tenkey-solo ${className}`}>
       <div className="tenkey-pad">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d, i) => (
-          <button key={d} className="tenkey-key" style={{ gridRow: Math.floor(i / 3) + 1, gridColumn: (i % 3) + 1 }} onClick={() => put(d)}>
+          <button key={d} className="tenkey-key" style={{ gridRow: Math.floor(i / 3) + 1, gridColumn: (i % 3) + 1 }} disabled={disabled} onClick={() => onKey(d)}>
             {d}
           </button>
         ))}
-        <button className="tenkey-key" style={{ gridRow: 4, gridColumn: 2 }} onClick={() => put('0')}>
+        <button className="tenkey-key" style={{ gridRow: 4, gridColumn: 2 }} disabled={disabled} onClick={() => onKey('0')}>
           0
         </button>
-        <button className="tenkey-key is-side" style={{ gridRow: 4, gridColumn: 1 }} onClick={() => setValue((v) => v.slice(0, -1))} aria-label="1文字消す">
+        <button
+          className="tenkey-key is-side"
+          style={{ gridRow: 4, gridColumn: 1 }}
+          disabled={disabled}
+          onClick={onDelete}
+          aria-label="1文字消す"
+          {...deleteProps}
+        >
           ⌫
         </button>
-        <button
-          className="tenkey-key is-ok"
-          style={{ gridRow: 4, gridColumn: 3 }}
-          disabled={value.length !== length}
-          onClick={submit}
-        >
+        <button className="tenkey-key is-ok" style={{ gridRow: 4, gridColumn: 3 }} disabled={disabled || okDisabled} onClick={onOk}>
           {okLabel}
         </button>
       </div>

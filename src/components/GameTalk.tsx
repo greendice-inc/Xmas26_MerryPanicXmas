@@ -29,13 +29,17 @@ export function useLineSound(line: NovelLine | undefined) {
 /**
  * ゲーム画面の上で話す1行（セリフ編集の「ゲーム画面中」の場面）。
  * pos：bottom=下のボタンのすぐ上 / corner=右上に小さく / top=画面の上 / shop=Santazon を開いている間の左下。
+ * wide=Santazon を開いている間の吹き出しを、画面の右端まで伸ばす（右下のボタンに重ねてよいとき）。
+ * dim=しゃべっている間、背景をうっすら暗くする（照らす枠を出しているときは false）。
  * low=下のボタンを出していないので、画面の一番下に出す（位置を決めていない行だけ） / compact=Santazon を開いているので小さめにする / wait=タップで進めない（▼を出さない）
  */
-export default function GameTalk({ line, compact, wait, low }: { line: NovelLine; compact?: boolean; wait?: boolean; low?: boolean }) {
+export default function GameTalk({ line, compact, wait, low, dim = true, wide }: { line: NovelLine; compact?: boolean; wait?: boolean; low?: boolean; dim?: boolean; wide?: boolean }) {
   useLineSound(line)
-  const pos = line.pos && line.pos !== 'bottom' ? ` is-${line.pos}` : low ? ' is-low' : compact ? ' is-compact' : ''
+  // Santazon を開いている間は、行の位置の指定に関わらず、いつも一番下（左下）で話す
+  const pos = compact ? ` is-shop${wide ? ' is-wide' : ''}` : line.pos && line.pos !== 'bottom' ? ` is-${line.pos}` : low ? ' is-low' : ''
   return (
     <>
+      {dim && <div className="talk-dim" />}
       {line.slide && <img className="game-slide" src={line.slide} alt="" />}
       <div className={`hide-elf guide-talk${pos}${wait ? ' is-wait' : ''}`}>
         <img src={lineImage(line)} alt="" />

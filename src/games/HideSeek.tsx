@@ -4,6 +4,7 @@ import AreaEditor from '../components/AreaEditor'
 import type { SzGuide, SzTab } from '../components/Santazon'
 import { useProducts } from '../santazon/useProducts'
 import GameTalk, { hl } from '../components/GameTalk'
+import { SPOTS, Spotlight } from './Stage1Guide'
 import { lineImage } from '../script/gameScenes'
 import { RECORDS, ST2_KIDS, st2GameImage, type NovelLine } from '../scenario'
 import { lineIndex, useGameLines } from '../script/scriptData'
@@ -22,6 +23,8 @@ import {
 /** 「みーつけた！」を見せる長さ */
 const FOUND_MS = 1800
 const CARD_ID = 'st2-card'
+/** 「リスト登録のタブを押しましょう。」を話し始めるまでの間 */
+const TAB_DELAY_MS = 900
 
 /** 案内が求める操作。tap=タップで次へ / shop=注文を開く / tab=リスト登録タブを押す / search=マネキンを検索する */
 type Wait = 'tap' | 'shop' | 'tab' | 'search'
@@ -61,10 +64,12 @@ interface Props {
   onGuide: (g: { menu: boolean; sz: SzGuide | null }) => void
   /** トミーまで見つけて、最後の台詞を読み終えた */
   onAllFound: () => void
+  /** 説明の最後（「ラウンド1、スタートです！」）のあと：暗くして Santazon を閉じ、ゲーム画面へ */
+  onTutorialEnd: (then: () => void) => void
 }
 
 /** ステージ2：かくれんぼ。ゲーム画面の隠れ場所をタップして三兄弟を見つける */
-export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllFound }: Props) {
+export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllFound, onTutorialEnd }: Props) {
   const { products } = useProducts()
   const { areas, saved } = useHideAreas()
   const hide: HideProgress = { tutorialDone: false, found: 0, ...doc.hide }
@@ -77,7 +82,6 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
   // ---------- エルフの案内 ----------
   const [step, setStep] = useState(0)
   // 案内が終わったあと、真ん中に出す「やること」のダイアログ
-  const [goal, setGoal] = useState(false)
   const tutorial = !hide.tutorialDone
   const tutorialLines = useGameLines('st2-tutorial')
   const foundLines = { amy: useGameLines('st2-amy'), jimmy: useGameLines('st2-jimmy'), tommy: useGameLines('st2-tommy') }
@@ -85,6 +89,14 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
   const cornerHint = tutorialLines.find((l) => l.id === CORNER_HINT)
   const lineText = tutorial ? tutorialLines[step] : undefined
   const line = lineText ? { ...fxOf(lineText.id), talk: lineText } : undefined
+  // 「リスト登録のタブを押しましょう。」は、Santazon の画面が出てから、ちょっと置いて話し始める
+  const [tabReady, setTabReady] = useState(false)
+  useEffect(() => {
+    if (line?.wait !== 'tab') return setTabReady(false)
+    const t = setTimeout(() => setTabReady(true), TAB_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [line?.wait, line?.talk.id])
+  const talkHeld = line?.wait === 'tab' && !tabReady
   // 演出の節目の行（名前で探す）。行を足したり並べ替えても、番号はここで取り直す
   const SHOP_STEP = lineIndex(tutorialLines, 'open-shop')
   const TAB_STEP = lineIndex(tutorialLines, 'tab')
@@ -137,10 +149,8 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
       if (!records.includes(CARD_ID)) update({ records: [...records, CARD_ID] })
     }
     if (step + 1 < tutorialLines.length) setStep(step + 1)
-    else {
-      update({ hide: { ...hide, tutorialDone: true } })
-      setGoal(true)
-    }
+    // 最後の台詞のあとは、ダイアログを出さずに、フェードでゲーム画面へ
+    else onTutorialEnd(() => update({ hide: { ...hide, tutorialDone: true } }))
   }
 
   // ---------- 見つける ----------
@@ -235,7 +245,7 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
           areas={areas}
           saved={saved}
           image={st2GameImage(found)}
-          aspect="1980 / 1200"
+          aspect="1920 / 1200"
           boxLabel={(a) => `${a.label}（${ROLE_LABEL[a.role]}）`}
           boxClass={(a) => `role-${a.role}`}
           fields={(sel, edit) => (
@@ -316,26 +326,21 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
         overlay(
           <>
             {line.wait === 'tap' && <div className="hide-catch" onClick={tapTutorial} />}
-            {/* 「リスト登録」タブ（x=1360〜1880、下端 y=140）を下から指す */}
-            {line.wait === 'tab' && <GuideArrow key="tab-arrow" x={1620} y={146} up />}
+            {/* 「リスト登録」タブ（x=1360〜1880、y=20〜140）だけ明るくして、下から指す */}
+            {line.wait === 'tab' && !talkHeld && <Spotlight rect={{ x: 1360, y: 20, w: 520, h: 120 }} pass />}
+            {line.wait === 'tab' && !talkHeld && <GuideArrow key="tab-arrow" x={1620} y={146} up />}
             {line.card && <img key={line.card} className="hide-card" src={RECORDS[CARD_ID].image} alt="" />}
             {line.wait === 'search' ? (
               // 検索してもらう行は、しゃべらせず、右上にダイアログだけ出しておく
               <div className="hide-search-dialog">{hl(line.talk.text)}</div>
             ) : (
-              <GameTalk line={line.talk} compact={compact} wait={line.wait !== 'tap'} />
+              <>
+                {/* 「まずは左下のボタンでsantazonを開いて……」：santazon のボタンだけ明るく見せる */}
+                {line.wait === 'shop' && <Spotlight rect={SPOTS.menuOrder} pass />}
+                {!talkHeld && <GameTalk line={line.talk} compact={compact} wide wait={line.wait !== 'tap'} dim={line.wait !== 'shop' && line.wait !== 'tab'} />}
+              </>
             )}
           </>,
-        )}
-
-      {goal &&
-        overlay(
-          <div className="hide-goal-back">
-            <div className="hide-goal">
-              <p>ラウンド1　アミーを見つけよう！</p>
-              <button onClick={() => setGoal(false)}>OK</button>
-            </div>
-          </div>,
         )}
 
       {elfSays &&

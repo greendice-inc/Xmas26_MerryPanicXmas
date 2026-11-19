@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import GameTalk from '../components/GameTalk'
 import { characterImage, type NovelLine } from '../scenario'
 import { useGameLines } from '../script/scriptData'
@@ -59,8 +59,8 @@ export const RULES_FX: Record<string, GuideFx> = {
 }
 /** 正しい注文が届いたあと（st1-sock）の、行ごとの演出 */
 export const SOCK_FX: Record<string, GuideFx> = {
-  // 「画面右下の「ソックスキーを導く」ボタンを押すと〜」：自動で Santazon の画面に移って、ボタンを矢印で指す
-  'sock-arrow': { openShop: true, arrow: 'sockKey' },
+  // 「画面右下の「ソックスキーを導く」ボタンを押すと〜」：Santazon が閉じていたら自動で開く（矢印は出さない）
+  'sock-arrow': { openShop: true },
   // 「実際に押してみましょう。」：Santazon のボタンを照らして、押すのを待つ
   'sock-press': { spot: 'szSock', wait: 'sock' },
 }
@@ -89,6 +89,9 @@ export function GuideArrow({ x, y, up }: { x: number; y: number; up?: boolean })
     </svg>
   )
 }
+
+/** Santazon の画面が切り替わってから、吹き出しが出るまでの間（ミリ秒） */
+const SETTLE_MS = 700
 
 /** idx より前で最後に待った操作（その画面を開いたまま、続きの台詞を話す） */
 function heldWait(fx: Record<string, GuideFx>, lines: NovelLine[], idx: number): GuideFx['wait'] | null {
@@ -144,6 +147,17 @@ export function GuideTalk({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needShop, idx])
 
+  // Santazon の画面が切り替わった直後は、吹き出しの形が変わって見えるので、ちょっと待ってから話し始める
+  const [settling, setSettling] = useState(false)
+  const prevShop = useRef(shopOpen)
+  useEffect(() => {
+    if (prevShop.current === shopOpen) return
+    prevShop.current = shopOpen
+    setSettling(true)
+    const t = setTimeout(() => setSettling(false), SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [shopOpen])
+
   // 待っていた操作が済んだら次へ
   useEffect(() => {
     if ((wait === 'shop' && shopOpen) || (wait === 'sock' && sockOpen)) setIdx((i) => i + 1)
@@ -170,7 +184,7 @@ export function GuideTalk({
   }
   return (
     <>
-      {!wait && <div className="hide-catch" onClick={next} />}
+      {!wait && !settling && <div className="hide-catch" onClick={next} />}
       {/* 画面を開き直すまでのあいだは、ハイライトと矢印を出さない */}
       {f.spot && !lost && !needShop && <Spotlight rect={SPOTS[f.spot]} pass={!!wait} />}
       {f.arrow && !lost && !needShop && <GuideArrow key={`arrow${idx}`} {...ARROWS[f.arrow]} />}
@@ -181,7 +195,7 @@ export function GuideTalk({
           <span>カットイン（仮）</span>
         </div>
       )}
-      <GameTalk line={line} wait={!!wait} compact={shopOpen} />
+      {!settling && <GameTalk line={line} wait={!!wait} compact={shopOpen} dim={!f.spot} />}
     </>
   )
 }

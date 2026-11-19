@@ -36,6 +36,6 @@ export const ROOM_BY_TEAM: Record<number, number> = Object.fromEntries(
 export const SECRET_TAP_COUNT = 5
 export const SECRET_TAP_WINDOW_MS = 3000
 
-export const HEARTBEAT_MS = 5000
+export const HEARTBEAT_MS = 15000
 /** この時間 heartbeat が無ければ切断扱い */
-export const PRESENCE_TIMEOUT_MS = 15000
+export const PRESENCE_TIMEOUT_MS = 45000

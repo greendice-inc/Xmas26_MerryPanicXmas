@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { hl, useLineSound } from '../components/GameTalk'
+import { TenKeyPad } from '../components/TenKey'
 import { lineImage } from '../script/gameScenes'
 import { useGameLines } from '../script/scriptData'
 import type { GameProps } from './index'
@@ -13,15 +14,13 @@ export const MARKS = [
   { id: 'snow', label: '雪の結晶', image: `${MARK_DIR}mark4.webp`, answer: 0 },
   { id: 'bolt', label: '雷', image: `${MARK_DIR}mark5.webp`, answer: 1 },
 ] as const
+/** 全マークの答え（シーンジャンプ・強制クリアで使う） */
+export const ALL_MARK_SCORES: Record<string, number> = Object.fromEntries(MARKS.map((m) => [m.id, m.answer]))
 /** ゲーム1の背景 */
 const MARK_BG = `${MARK_DIR}1st_back_1.webp`
 
 type MarkId = (typeof MARKS)[number]['id']
 
-/** テンキー：数字は横一列、その右に「消す」「確定」 */
-const DIGIT_KEYS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
-const ACTION_KEYS = ['DEL', 'OK'] as const
-const KEYS = [...DIGIT_KEYS, ...ACTION_KEYS] as const
 /** 入力できる最大桁数 */
 const MAX_DIGITS = 9
 
@@ -30,10 +29,10 @@ type Guide = 'start' | 'picking' | 'wrongFirst' | 'wrong' | 'right' | 'done'
 
 const ALL_SOLVED = Object.fromEntries(MARKS.map((m) => [m.id, m.answer])) as Partial<Record<MarkId, number>>
 
-export default function MarkGame({ onClear, solved: allDone }: GameProps) {
+export default function MarkGame({ onClear, solved: allDone, scores, onScore }: GameProps) {
   // ?debug=true のときは、答えを左に出す
   const debug = new URLSearchParams(location.search).get('debug') === 'true'
-  const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : {})
+  const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : ((scores ?? {}) as Partial<Record<MarkId, number>>))
   const [selected, setSelected] = useState<MarkId | null>(null)
   const [input, setInput] = useState('')
   const [guide, setGuide] = useState<Guide>('start')
@@ -60,6 +59,18 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
   const onClearRef = useRef(onClear)
   onClearRef.current = onClear
 
+  // 隠しメニューの「ゲームを強制クリア」：各マークに正解を自動で入力する（そのあとは、ふつうに解いたときと同じ流れ）
+  useEffect(() => {
+    const force = () => {
+      Object.entries(ALL_SOLVED).forEach(([id, a]) => onScore?.(id, a as number))
+      setSolved(ALL_SOLVED)
+      setSelected(null)
+      setInput('')
+    }
+    window.addEventListener('mpx:force-clear', force)
+    return () => window.removeEventListener('mpx:force-clear', force)
+  }, [])
+
   const allSolved = MARKS.every((m) => solved[m.id] !== undefined)
 
   useEffect(() => {
@@ -77,14 +88,29 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
     if (solved[id] !== undefined) return
     setSelected(id)
     setInput('')
-    say('picking')
+    // マークを選んでも、吹き出しは変えない（「その調子！」などが出ていれば、そのまま）
   }
 
-  const press = (key: (typeof KEYS)[number]) => {
+  const press = (key: string) => {
     if (!selected) return
     if (key === 'DEL') setInput((v) => v.slice(0, -1))
     else if (key === 'OK') confirm()
     else setInput((v) => (v.length < MAX_DIGITS ? v + key : v))
+  }
+
+  // 「消す」を長押しすると、入力を全部消す
+  const delTimer = useRef<number | null>(null)
+  const delLong = useRef(false)
+  const delDown = () => {
+    delLong.current = false
+    delTimer.current = window.setTimeout(() => {
+      delLong.current = true
+      setInput('')
+    }, 600)
+  }
+  const delUp = () => {
+    if (delTimer.current != null) window.clearTimeout(delTimer.current)
+    delTimer.current = null
   }
 
   const confirm = () => {
@@ -92,6 +118,7 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
     const mark = MARKS.find((m) => m.id === selected)!
     if (Number(input) === mark.answer) {
       setSolved((s) => ({ ...s, [selected]: mark.answer }))
+      onScore?.(selected, mark.answer)
       setSelected(null)
       setInput('')
       say('right')
@@ -106,7 +133,7 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
   useLineSound(speak)
 
   return (
-    <div className="game mark-game">
+    <div className="game mark-game is-speak-bottom">
       <img className="mark-bg" src={MARK_BG} alt="" />
       {debug && (
         <ul className="mark-debug" aria-hidden>
@@ -119,6 +146,7 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
         </ul>
       )}
       <div className="mark-body">
+       <div className="mark-panel">
         <div className="mark-grid">
           {MARKS.map((m) => {
             const answer = solved[m.id]
@@ -137,25 +165,30 @@ export default function MarkGame({ onClear, solved: allDone }: GameProps) {
             )
           })}
         </div>
-        <div className="mark-pad">
-          <div className="mark-input" aria-live="polite">{input || ' '}</div>
-          <div className="mark-keypad">
-            <div className="key-row digits">
-              {DIGIT_KEYS.map((k) => (
-                <button key={k} className="key-btn" onClick={() => press(k)}>{k}</button>
-              ))}
-            </div>
-            <div className="key-row actions">
-              <button className="key-btn is-del" onClick={() => press('DEL')}>消す</button>
-              <button className="key-btn is-ok" disabled={!selected || input === ''} onClick={() => press('OK')}>確定</button>
-            </div>
+        <div className="mark-entry">
+          {/* 入力欄：区切りのない1つの枠（ソックスキーのナゾの枠と同じ色づかい） */}
+          <div className={`mark-answer${selected ? ' is-cur' : ''}`} aria-live="polite">
+            {input}
           </div>
+          {/* テンキーは、ソックスキーのナゾと同じ部品（大きさ・見た目が同じ） */}
+          <TenKeyPad
+            className={`mark-keypad${selected ? '' : ' is-idle'}`}
+            disabled={!selected}
+            okDisabled={input === ''}
+            onKey={(d) => press(d)}
+            onDelete={() => {
+              if (!delLong.current) press('DEL')
+            }}
+            onOk={() => press('OK')}
+            deleteProps={{ onPointerDown: delDown, onPointerUp: delUp, onPointerLeave: delUp }}
+          />
         </div>
+       </div>
       </div>
       {/* すべて分かったあとは、続きの説明（画面の上に出る会話）に任せる */}
       {!allDone && speak?.slide && <img className="game-slide" src={speak.slide} alt="" />}
       {!allDone && speak && (
-        <div className="mark-speak">
+        <div className="mark-speak is-bottom">
           <img className="mark-speak-icon" src={lineImage(speak)} alt="" />
           <div
             className={`mark-speak-box${guideIdx + 1 < GUIDE[guide].length ? ' is-more' : ''}`}

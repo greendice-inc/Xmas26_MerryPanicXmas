@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { STAGE_H, STAGE_W } from '../config'
+import { PREVIEW } from '../preview'
 
 /** 1920x1200 の「大きな板」を作り、ウィンドウに収まるよう拡縮して中央に置く */
 export default function Stage({ children }: { children: ReactNode }) {
   const [scale, setScale] = useState(1)
   useEffect(() => {
-    const fit = () => setScale(Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H))
+    // プレビューは拡縮しない（Figma に 1920x1200 のまま取り込む）
+    const fit = () => setScale(PREVIEW ? 1 : Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H))
     fit()
     window.addEventListener('resize', fit)
     return () => window.removeEventListener('resize', fit)
@@ -18,8 +20,8 @@ export default function Stage({ children }: { children: ReactNode }) {
         style={{
           width: STAGE_W,
           height: STAGE_H,
-          left: (window.innerWidth - STAGE_W * scale) / 2,
-          top: (window.innerHeight - STAGE_H * scale) / 2,
+          left: PREVIEW ? 0 : (window.innerWidth - STAGE_W * scale) / 2,
+          top: PREVIEW ? 0 : (window.innerHeight - STAGE_H * scale) / 2,
           transform: `scale(${scale})`,
         }}
       >

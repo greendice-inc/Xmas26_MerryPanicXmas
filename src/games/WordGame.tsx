@@ -272,7 +272,7 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
       {view}
 
 
-      {/* ?debug=true の隠しメニュー（左上の角を押すと開く）：エリア編集・強制クリア */}
+      {/* ?debug=true の隠しメニュー（左上の角を押すと開く）：エリア編集（強制クリアは、左上の隠しメニューへ移した） */}
       {debug && playing && !busy && (
         <div className="debug-hidden">
           <button className="debug-hidden-tap" aria-label="デバッグメニュー" onClick={() => setDebugMenu((o) => !o)} />
@@ -285,15 +285,6 @@ export default function WordGame({ doc, update, shopOpen, chair, onChairDone }: 
                 }}
               >
                 {editing ? 'ゲームに戻る' : 'エリア編集'}
-              </button>
-              <button
-                disabled={editing}
-                onClick={() => {
-                  setDebugMenu(false)
-                  onClear()
-                }}
-              >
-                強制クリア
               </button>
             </div>
           )}
