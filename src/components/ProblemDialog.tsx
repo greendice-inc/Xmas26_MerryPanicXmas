@@ -148,7 +148,7 @@ export default function ProblemDialog({
   const { products } = useProducts()
   const first = products.find((p) => p.id === (order.items[0]?.id ?? ''))
   const base = given ?? (first ? PROBLEMS[first.category] : undefined)
-  // 答えは、注文した商品のアイテム番号を桁ごとに足したもの（ソックスキーの番号）
+  // 答えは、注文した商品のアイテム番号を4ケタの数として足した合計（ソックスキーの番号）
   const answer = sockKeyOfItems(order.items, products)
   const problem = base ? { ...base, answer } : undefined
   const solved = order.status === 'solved'

@@ -191,14 +191,14 @@ export default function PlayerScreen({ team }: { team: number }) {
     }
     const order = doc.order
     if (!order || order.status !== 'delivered' || !requestProblem?.request) return 'none'
-    // 答えは、注文した商品のアイテム番号を桁ごとに足したもの
+    // 答えは、注文した商品のアイテム番号を4ケタの数として足した合計
     if (code !== sockKeyOfItems(order.items, products)) return 'wrong'
     // Santazon は開いたまま。エルフが話してから、フェードでゲーム画面へ（BingoGame の onFadeToGame）
     onSolved()
     return 'ok'
   }
 
-  // 宅配ソックスの番号（大人部屋に出す）。注文した商品のアイテム番号を、桁ごとに足したもの
+  // 宅配ソックスの番号（大人部屋に出す）。注文した商品のアイテム番号を、4ケタの数として足した合計
   const sockCode = doc.order ? sockKeyOfItems(doc.order.items, products) : undefined
   // デバッグモード（?debug=true）：ソックスキーの答えを、画面の上に出す
   const debugMode = new URLSearchParams(location.search).get('debug') === 'true'
