@@ -5,7 +5,7 @@ import type { LastStep, OrderItem } from '../types'
  * LAST（ファイナルゲーム「エントツギフト」）。
  * basket=バスケットボールを注文しようとするが、宅配ソックスが埋まっている
  * extract=取り出し依頼（1225）が通って、エルフが話している
- * balls=エントツとボールを注文する（届いたら30秒で次へ）
+ * balls=エントツとグリーンボールを注文する（届いたら30秒で次へ）
  * notice=警告マークの通知が来ている（押すとマスターエルフの会話）
  * super=ルドリーのためにスーパーボールと金庫を注文する（届いたらタップで最後へ）
  */
@@ -13,14 +13,16 @@ export const LAST_STEPS: LastStep[] = ['basket', 'extract', 'balls', 'notice', '
 
 /** 取り出し依頼で入れる番号（ルドリーの宅配ソックス）。スーパーボール 1200 ＋ 金庫 0025 の桁ごとの合計 */
 export const LAST_REQUEST_CODE = '1225'
-/** 大人チームが入れたボールの得点（仮。決まったら書き換える） */
-export const LAST_ADULT_POINTS = 210
-/** ルドリーの最後の得点 */
-export const LAST_KID_POINTS = 250
+/** 大人チームが入れたボールの得点 */
+export const LAST_ADULT_POINTS = 260
+/** ルドリーの得点がここまで来たら、勝ち（クリアの演出）。このあとも数え続ける */
+export const LAST_KID_POINTS = 270
+/** ルドリーの得点が最後に止まるところ（本来の想定では5万ポイントくらいまで貯まる） */
+export const LAST_KID_MAX = 50000
 
 /** 注文のあとに出す問題の画像など（答えは、注文の中身から計算する：products.ts の sockKeyOf） */
 export const LAST_PROBLEMS: Partial<Record<LastStep, { image?: string }>> = {
-  // F：エントツ（エントツとボール2種の注文）
+  // F：エントツ（エントツとグリーンボール2つの注文）
   balls: { image: SOCK_KEY_IMAGE('f') },
   super: {},
 }
@@ -41,13 +43,10 @@ export const isBasketCart = (items: OrderItem[], products: Product[]) => {
 }
 export const hasBasket = (items: OrderItem[], products: Product[]) => bigBalls(names(items, products)) > 0
 
-const BALLS = ['イエローボール', 'グリーンボール', 'パープルボール']
-/** エントツと、イエロー・グリーン・パープルのうち違う2つ（順不同） */
+/** エントツ1つと、グリーンボール2個を2つ */
 export const isBallsCart = (items: OrderItem[], products: Product[]) => {
   const n = names(items, products)
-  if (n.length !== 3 || has(n, 'エントツ') !== 1) return false
-  const balls = BALLS.map((b) => has(n, b))
-  return balls.every((c) => c <= 1) && balls.reduce((a, b) => a + b, 0) === 2
+  return n.length === 3 && has(n, 'エントツ') === 1 && has(n, 'グリーンボール') === 2
 }
 
 /** スーパーボールと金庫を1つずつ */

@@ -1389,6 +1389,9 @@ button.tenkey-key.is-ok:disabled { opacity: .4; transform: none; }
 .last-score small { flex-basis: 100%; text-align: center; font-size: 44px; font-weight: 900; color: var(--ink); }
 .last-score b { font-family: 'Line', sans-serif; font-size: 200px; line-height: 1; font-weight: 900; color: var(--red); font-variant-numeric: tabular-nums; }
 .last-score.is-kid b { color: #2f6fde; }
+/* 得点のケタが増えたら、枠からはみ出ないように字を小さくする */
+.last-score b.is-4 { font-size: 144px; }
+.last-score b.is-5 { font-size: 114px; }
 .last-score span { font-family: 'Line', sans-serif; font-size: 60px; font-weight: 900; color: var(--ink-sub); }
 .last-vs { font-family: 'Line', sans-serif; font-size: 96px; font-weight: 900; color: #fff; -webkit-text-stroke: 10px var(--charcoal); paint-order: stroke fill; }
 .last-pop {
@@ -1742,7 +1745,7 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 /* 記録：文字だけのページ */
 .records-text { padding: 24px 28px; text-align: left; }
 .records-body .records-text figcaption { text-align: left; }
-.records-text p { white-space: pre-line; margin: 8px 0 0; font-size: 52px; font-weight: 900; line-height: 1.5; }
+.records-text p { white-space: pre-line; margin: 8px 0 0; font-size: 42px; font-weight: 900; line-height: 1.5; }
 .bingo-hint { white-space: pre-line; }
 
 /* ？が公開される：左上から、じわーっと本物に変わる */
@@ -1838,16 +1841,16 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 
 /* 記録：マークのルール */
 .records-body .records-rule { gap: 6px; }
-.records-rule h3 { margin: 22px 0 4px; padding-left: 14px; border-left: 10px solid #1f5fc4; font-size: 44px; font-weight: 900; color: #1f5fc4; }
+.records-rule h3 { margin: 22px 0 4px; padding-left: 14px; border-left: 10px solid #1f5fc4; font-size: 38px; font-weight: 900; color: #1f5fc4; }
 .records-rule ul { margin: 0; padding-left: 1.2em; list-style: '・'; }
-.records-rule li { font-size: 40px; font-weight: 900; line-height: 1.55; color: var(--ink); }
+.records-rule li { font-size: 34px; font-weight: 900; line-height: 1.55; color: var(--ink); }
 .records-rule li .hl { color: var(--red); }
 .records-marks { display: flex; gap: 36px; margin-top: 8px; }
 .records-mark { display: flex; align-items: center; gap: 12px; }
 .records-body .records-mark img { width: 150px; height: 150px; border-radius: 0; }
 .records-mark b { min-width: 2ch; font-size: 60px; font-weight: 900; line-height: 1.3; color: var(--ink); }
 
-.records-rule .records-lead { margin: 8px 0 0; font-size: 44px; font-weight: 900; line-height: 1.6; color: var(--ink); }
+.records-rule .records-lead { margin: 8px 0 0; font-size: 36px; font-weight: 900; line-height: 1.6; color: var(--ink); }
 
 /* 記録：見出し（赤いタイトル・青い見出し）はすべて左端。その下の中身（概要・箇条書き・マーク）が1段字下げ */
 .records-rule .records-lead, .records-rule ul, .records-rule .records-marks { margin-left: 36px; }

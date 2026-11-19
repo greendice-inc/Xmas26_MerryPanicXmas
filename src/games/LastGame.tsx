@@ -5,7 +5,7 @@ import TenKey from '../components/TenKey'
 import { useGameLines } from '../script/scriptData'
 import { backgroundImage, JACK_ICON, st3GameImage, STF_NAME } from '../scenario'
 import { DEFAULT_LAST, type LastProgress, type TeamDoc } from '../types'
-import { LAST_ADULT_POINTS, LAST_KID_POINTS } from './lastData'
+import { LAST_ADULT_POINTS, LAST_KID_MAX, LAST_KID_POINTS } from './lastData'
 import { SOCK_KEY_IMAGE } from '../santazon/products'
 import { ASPECT, WORD_GAMES, WordBoard } from './WordGame'
 import { useWordAreas } from './wordAreas'
@@ -22,12 +22,14 @@ const COUNT_SHORT_MS = 170
 const COUNT_JITTER_MS = 30
 /** だんだん間隔が短くなる：1回入るごとに、間隔が前の 0.98 倍になる（長い間隔も短い間隔も、同じ割合で縮むので、リズムは保ったまま速くなる） */
 const COUNT_DECAY = 0.98
+/** 速くなっても、これより短くはしない（1コマぶん） */
+const COUNT_MIN_MS = 16
 /** n 回目の10ポイントが入るまでの間 */
 function nextCountDelay(n: number): number {
   if (n <= 1) return COUNT_FIRST_MS
   const ratio = COUNT_DECAY ** (n - 2)
   const base = (n % 2 === 0 ? COUNT_LONG_MS : COUNT_SHORT_MS) * ratio
-  return Math.round(base + (Math.random() * 2 - 1) * COUNT_JITTER_MS * ratio)
+  return Math.max(COUNT_MIN_MS, Math.round(base + (Math.random() * 2 - 1) * COUNT_JITTER_MS * ratio))
 }
 /** ジャック機能で見える、ルドリーの注文ナゾ */
 // E：ジャック機能で見るルドリーの画面に出ているナゾ
@@ -55,7 +57,7 @@ function Points({ adult, kid, pop }: { adult: number; kid: number; pop?: number 
       <div className="last-vs">VS</div>
       <div className="last-score is-kid">
         <small>{STF_NAME}</small>
-        <b>{kid}</b>
+        <b className={kid >= 10000 ? 'is-5' : kid >= 1000 ? 'is-4' : undefined}>{kid}</b>
         <span>pt</span>
         {pop != null && (
           <em className="last-pop" key={pop}>
@@ -176,19 +178,23 @@ export function LastEnding() {
   const [idx, setIdx] = useState(0)
   const [kid, setKid] = useState(0)
 
-  // 10点ずつ、何回も入る
+  // 10点ずつ、何回も入る。勝ったあとの会話・ゲーム終了の画面でも数え続ける（エクストラゲームの間は止める）
+  const counting = part === 'count' || part === 'talk2' || part === 'done'
   useEffect(() => {
-    if (part !== 'count') return
-    if (kid >= LAST_KID_POINTS) {
-      const t = setTimeout(() => {
-        setIdx(0)
-        setPart('talk2')
-      }, 1200)
-      return () => clearTimeout(t)
-    }
+    if (!counting || kid >= LAST_KID_MAX) return
     const t = setTimeout(() => setKid((k) => k + 10), nextCountDelay(kid / 10 + 1))
     return () => clearTimeout(t)
-  }, [part, kid])
+  }, [counting, kid])
+  // 勝ちの得点に届いたら、少し待ってクリアの演出（会話）へ
+  const won = kid >= LAST_KID_POINTS
+  useEffect(() => {
+    if (part !== 'count' || !won) return
+    const t = setTimeout(() => {
+      setIdx(0)
+      setPart('talk2')
+    }, 1200)
+    return () => clearTimeout(t)
+  }, [part, won])
 
   const end1 = useGameLines('st5-end1')
   const end2 = useGameLines('st5-end2')
@@ -207,8 +213,8 @@ export function LastEnding() {
 
   return (
     <div className="last-game" ref={ref} style={BG}>
-      <Points adult={LAST_ADULT_POINTS} kid={kid} pop={part === 'count' && kid > 0 ? kid : undefined} />
-      {(part === 'talk2' || part === 'done') && kid >= LAST_KID_POINTS && <div className="last-winner">WINNER {STF_NAME}</div>}
+      <Points adult={LAST_ADULT_POINTS} kid={kid} pop={counting && kid > 0 && kid < LAST_KID_MAX ? kid : undefined} />
+      {(part === 'talk2' || part === 'done') && won && <div className="last-winner">WINNER {STF_NAME}</div>}
       {part === 'done' && (
         <div className="last-end">
           <div className="last-end-title">ゲーム終了</div>
