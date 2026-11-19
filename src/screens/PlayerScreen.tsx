@@ -504,11 +504,12 @@ export default function PlayerScreen({ team }: { team: number }) {
     'st4-mood': doc.stage > BINGO_STAGE || doc.phase === 'end' || (doc.stage === BINGO_STAGE && !!doc.bingo?.jack),
     'st5-mood': doc.phase === 'end' || (doc.stage === LAST_STAGE && doc.phase !== 'novel'),
   }
+  // 並び（各ステージのタブの中）：まとめ → 子どものキモチ → そのほかの記録
   const records = [
+    ...[1, 2, 3, 4, 5].flatMap((st) => (doc.started && passed(st) ? [`st${st}-sum`] : [])),
     ...Object.entries(moodShown).flatMap(([id, on]) => (on ? [id] : [])),
     ...(markStarted ? ['st1-rule'] : []),
     ...(doc.records ?? []),
-    ...[1, 2, 3, 4, 5].flatMap((st) => (doc.started && passed(st) ? [`st${st}-sum`] : [])),
   ].filter((id) => RECORDS[id])
   const moods: Record<string, Mood> = {
     'st1-mood': ST1_MOOD,
