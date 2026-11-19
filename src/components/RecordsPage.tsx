@@ -13,6 +13,7 @@ export default function RecordsPage({
   records,
   textOf,
   iconOf = {},
+  titleOf = {},
   markScores = {},
   onClose,
 }: {
@@ -22,6 +23,8 @@ export default function RecordsPage({
   textOf: Record<string, string[]>
   /** 文字の記録の左に置くアイコン */
   iconOf?: Record<string, string>
+  /** 見出しを、RECORDS の title から差し替える（キモチの「◯◯のキモチ」など） */
+  titleOf?: Record<string, string>
   /** 「マークのルール」に出す、答えが合ったマークと得点 */
   markScores?: Record<string, number>
   onClose: () => void
@@ -90,7 +93,7 @@ export default function RecordsPage({
         {list.map((id) =>
           id === 'st1-rule' ? (
             <figure key={id} className="records-rule">
-              <figcaption className="records-name">{RECORDS[id].title}</figcaption>
+              <figcaption className="records-name">{titleOf[id] ?? RECORDS[id].title}</figcaption>
               <p className="records-lead">
                 リングを投げて、ターゲットに入れよう！
               </p>
@@ -125,7 +128,7 @@ export default function RecordsPage({
               <div className="records-row">
                 <img className="records-icon" src={iconOf[id]} alt="" />
                 <div>
-                  <figcaption className="records-name">{RECORDS[id].title}</figcaption>
+                  <figcaption className="records-name">{titleOf[id] ?? RECORDS[id].title}</figcaption>
                   {textOf[id].map((l, i) => (
                     <p key={i}>{l}</p>
                   ))}
@@ -134,7 +137,7 @@ export default function RecordsPage({
             </figure>
           ) : (
             <figure key={id} className={textOf[id] ? 'records-text' : undefined}>
-              <figcaption>{RECORDS[id].title}</figcaption>
+              <figcaption>{titleOf[id] ?? RECORDS[id].title}</figcaption>
               {textOf[id] ? (
                 textOf[id].map((l, i) => <p key={i}>{l}</p>)
               ) : (

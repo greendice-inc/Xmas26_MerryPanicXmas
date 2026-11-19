@@ -21,6 +21,7 @@ import { useProducts } from '../santazon/useProducts'
 import { useGameLines, useScriptScene } from '../script/scriptData'
 import { hl } from '../components/GameTalk'
 import RecordsPage from '../components/RecordsPage'
+import { SUMMARIES, TASKS, type TaskText } from '../taskTexts'
 import { PREVIEW } from '../preview'
 import { ALL_MARK_SCORES } from '../games/MarkGame'
 import { CLEAR, NOVEL, RECORDS, characterImage, LAST_MOOD, LAST_MOOD_AFTER, ST1_MOOD, ST2_MOOD, ST3_MOOD, ST4_MOOD, type Mood } from '../scenario'
@@ -32,8 +33,6 @@ import { DEFAULT_BINGO, DEFAULT_LAST, DEFAULT_WORD, type OrderItem } from '../ty
 const DELIVER_MS = 3500
 /** ステージ4 ROUND2：ナゾを開いて少したってから出す案内 */
 const R2_HINT = 'これまでに発送した際のアイテムとソックスキーは、\n「記録」画面で確認できます。'
-const STAGE1_MARK_TASK = 'ゲームに使う５つのマークの得点を特定しよう。'
-const STAGE1_TASK = '失格せずに、リンを勝たせる。'
 
 /** 暗転からのフェードインの長さ（styles.css の .fade-black と合わせる） */
 const FADE_MS = 2500
@@ -487,7 +486,38 @@ export default function PlayerScreen({ team }: { team: number }) {
     (lastStep != null && doc.phase === 'game' && (lastStep === 'extract' || lastStep === 'notice'))
   // ステージ1のリンのキモチは、マークが始まったときから記録に入る（保存はせず、いまの位置から決める）
   const markStarted = doc.started && (doc.stage > 1 || doc.phase === 'game' || doc.phase === 'clear' || doc.phase === 'end')
-  const records = [...(markStarted ? ['st1-mood', 'st1-rule'] : []), ...(doc.records ?? [])].filter((id) => RECORDS[id])
+  // そのステージを終えたか（まとめを載せる）。ステージ1のクリア後の会話はマークのあとなので、次のステージに進んでから
+  const lastNow = doc.last?.step ?? 'basket'
+  const passed = (st: number) =>
+    doc.phase === 'end' ||
+    doc.stage > st ||
+    (doc.stage === st && st !== 1 && doc.phase === 'clear') ||
+    (st === LAST_STAGE && doc.stage === st && (lastNow === 'notice' || lastNow === 'super'))
+  // 子どものキモチは、ゲームでキモチが分かったところから載る（前は「やるべきこと」に出していたのと同じところ）
+  const moodShown = {
+    'st1-mood': markStarted,
+    'st2-mood': doc.stage > HIDE_STAGE || doc.phase === 'end' || (doc.stage === HIDE_STAGE && doc.phase !== 'novel'),
+    'st3-mood':
+      doc.stage > WORD_STAGE ||
+      doc.phase === 'end' ||
+      (doc.stage === WORD_STAGE && (doc.phase === 'clear' || (doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'rule'))),
+    'st4-mood': doc.stage > BINGO_STAGE || doc.phase === 'end' || (doc.stage === BINGO_STAGE && !!doc.bingo?.jack),
+    'st5-mood': doc.phase === 'end' || (doc.stage === LAST_STAGE && doc.phase !== 'novel'),
+  }
+  const records = [
+    ...Object.entries(moodShown).flatMap(([id, on]) => (on ? [id] : [])),
+    ...(markStarted ? ['st1-rule'] : []),
+    ...(doc.records ?? []),
+    ...[1, 2, 3, 4, 5].flatMap((st) => (doc.started && passed(st) ? [`st${st}-sum`] : [])),
+  ].filter((id) => RECORDS[id])
+  const moods: Record<string, Mood> = {
+    'st1-mood': ST1_MOOD,
+    'st2-mood': ST2_MOOD,
+    'st3-mood': ST3_MOOD,
+    'st4-mood': ST4_MOOD,
+    'st5-mood': lastNow === 'super' || doc.phase === 'end' ? LAST_MOOD_AFTER : LAST_MOOD,
+  }
+  const moodLines = (m: Mood) => m.lines.map((l) => (l.who ? `${l.who}「${l.text}」` : l.text))
   // ステージ4 ROUND1 で発送したアイテムと、ソックスキー（ROUND2 の「番号の法則」のナゾの手がかり）
   const r1Record = (() => {
     const items = (ROUNDS.r1.order ?? []).flatMap((w) => {
@@ -496,15 +526,37 @@ export default function PlayerScreen({ team }: { team: number }) {
     })
     return [...items.map((i) => `${i.name}（アイテム番号 ${i.code}）`), `ソックスキー ${sockKeyOfItems(items, products)}`]
   })()
-  // 「やるべきこと」：そのステージでやること と、子どものキモチ（ハートの代わり）
-  const task: { text?: string; mood?: Mood } = (() => {
-    if (doc.phase !== 'game') return {}
-    if (doc.stage === 1) return doc.markCleared ? { text: STAGE1_TASK } : { text: STAGE1_MARK_TASK }
-    if (doc.stage === HIDE_STAGE) return { mood: ST2_MOOD }
-    if (doc.stage === WORD_STAGE) return (doc.word?.step ?? 'rule') === 'rule' ? {} : { mood: ST3_MOOD }
-    if (doc.stage === BINGO_STAGE) return doc.bingo?.jack ? { mood: ST4_MOOD } : {}
-    if (doc.stage === LAST_STAGE) return { mood: lastStep === 'super' ? LAST_MOOD_AFTER : LAST_MOOD }
-    return {}
+  // 「やるべきこと」：場面ごとの見出しと本文（taskTexts.ts）。子どものキモチは記録へ移した
+  const task: TaskText | null = (() => {
+    if (doc.phase !== 'game') return null
+    const o = doc.order
+    const ordered = !!o && correctCart(o.items)
+    if (doc.stage === 1) {
+      if (!doc.markSolved) return TASKS.st1Start
+      if (ordered && o!.status === 'solved') return null
+      return ordered ? TASKS.st1Ordered : TASKS.st1Solved
+    }
+    if (doc.stage === HIDE_STAGE) {
+      const found = doc.hide?.found ?? 0
+      return found === 0 ? TASKS.st2Amy : found === 1 ? TASKS.st2Jimmy : found === 2 ? TASKS.st2Dummy : null
+    }
+    if (doc.stage === WORD_STAGE) {
+      const w = doc.word?.step ?? 'rule'
+      if (w === 'rule' || w === 'g1') return TASKS.st3R1
+      if (w === 'g2') return TASKS.st3R2
+      return ordered ? TASKS.st3Ordered : TASKS.st3Room
+    }
+    if (doc.stage === BINGO_STAGE) {
+      if (ordered && o!.status !== 'solved') return TASKS.st4Ordered
+      const b = doc.bingo?.step ?? 'rule'
+      return b === 'r2' ? TASKS.st4R2 : b === 'done' ? null : TASKS.st4R1
+    }
+    if (doc.stage === LAST_STAGE) {
+      if (lastNow === 'basket') return o ? TASKS.st5Ordered : TASKS.st5Start
+      if (lastNow === 'notice' || lastNow === 'super') return TASKS.st5Rudolly
+      return lastNow === 'balls' && ordered && o!.status === 'solved' ? TASKS.st5Solved : TASKS.st5Extracted
+    }
+    return null
   })()
   // ステージ1の案内中に、注文ボタンだけ押せるようにする
   const canOrder = !markQuiz || guideWait === 'shop'
@@ -627,7 +679,7 @@ export default function PlayerScreen({ team }: { team: number }) {
                     setShopOpen(!shopOpen)
                   }
             }
-            onTask={task.text || task.mood ? () => setTaskOpen(true) : undefined}
+            onTask={task ? () => setTaskOpen(true) : undefined}
             onRecord={records.length ? () => setRecordsOpen(true) : undefined}
             guide={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && guide.menu) || (sockGlow && !shopOpen && !talking) ? '注文' : null}
             guided={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && (guide.menu || !!guide.sz))}
@@ -722,33 +774,23 @@ export default function PlayerScreen({ team }: { team: number }) {
             <RecordsPage
               unlocked={doc.phase === 'end' ? GAME_COUNT : doc.stage}
               records={records}
-              textOf={{ 'st1-mood': ST1_MOOD.lines.map((l) => l.text), 'st4-r1': r1Record }}
-              iconOf={{ 'st1-mood': ST1_MOOD.icon }}
+              textOf={{
+                ...Object.fromEntries(Object.entries(moods).map(([id, m]) => [id, moodLines(m)])),
+                ...Object.fromEntries(Object.entries(SUMMARIES).map(([id, t]) => [id, [t]])),
+                'st4-r1': r1Record,
+              }}
+              iconOf={Object.fromEntries(Object.entries(moods).map(([id, m]) => [id, m.icon]))}
+              titleOf={Object.fromEntries(Object.entries(moods).map(([id, m]) => [id, `${m.name}のキモチ`]))}
               markScores={doc.markScores ?? (doc.markSolved || doc.stage > 1 ? ALL_MARK_SCORES : {})}
               onClose={() => setRecordsOpen(false)}
             />
           )}
-          {!talking && taskOpen && (
+          {!talking && taskOpen && task && (
             <div className="modal-back" onClick={() => setTaskOpen(false)}>
               <div className="modal task-modal">
                 <h2>やるべきこと</h2>
-                {task.text && <p className="task-text">{task.text}</p>}
-                {/* 子どものキモチ（前はハートのボタンで見ていたもの） */}
-                {task.mood && (
-                  <div className="task-mood">
-                    <img src={task.mood.icon} alt="" />
-                    <div>
-                      <h3>{task.mood.name}のキモチ</h3>
-                      {task.mood.lines.map((l, i) => (
-                        <p key={i}>
-                          {l.who && <small>{l.who}</small>}
-                          {task.mood!.lines.length > 1 ? `「${l.text}」` : l.text}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
+                {task && <p className="task-title">{task.title}</p>}
+                {task?.body && <p className="task-body">{task.body}</p>}
               </div>
             </div>
           )}

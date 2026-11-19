@@ -131,6 +131,17 @@ export const RECORDS: Record<string, { stage: number; title: string; image: stri
   'st2-card': { stage: 2, title: 'マネキンとセーターの商品カード', image: `${BASE}slide/st2/card.png` },
   // ステージ4 ROUND1 で発送したアイテムとソックスキー（中身はゲーム画面で作る。画像なし）
   'st4-r1': { stage: 4, title: 'ROUND1で発送したアイテムとソックスキー', image: '' },
+  // 子どものキモチ（見出しと中身は PlayerScreen で、各ステージの Mood から作る）
+  'st2-mood': { stage: 2, title: 'キモチ', image: '' },
+  'st3-mood': { stage: 3, title: 'キモチ', image: '' },
+  'st4-mood': { stage: 4, title: 'キモチ', image: '' },
+  'st5-mood': { stage: 5, title: 'キモチ', image: '' },
+  // ステージを終えたあとのまとめ（中身は taskTexts.ts の SUMMARIES）
+  'st1-sum': { stage: 1, title: 'まとめ', image: '' },
+  'st2-sum': { stage: 2, title: 'まとめ', image: '' },
+  'st3-sum': { stage: 3, title: 'まとめ', image: '' },
+  'st4-sum': { stage: 4, title: 'まとめ', image: '' },
+  'st5-sum': { stage: 5, title: 'まとめ', image: '' },
 }
 
 /** ステージ2：三人のキモチ。誰がどの名前かはわからないので、アイコンはシルエットのまま */
