@@ -790,6 +790,9 @@ function SearchTab({
 
       {arrow && !drag && (
         <svg
+          // 行き先が変わるたびに作り直して、動きを最初からやり直す。
+          // 作り直さないと、端末によっては（iPad の Safari など）動いている途中の矢印が前の行き先（--dx/--dy）のまま動き、1つ右の枠などへ向かってしまう
+          key={`${emptyIdx}-${guideDigit}-${Math.round(arrow.sx)}-${Math.round(arrow.ex)}-${Math.round(arrow.ey)}`}
           className="sz-drag-arrow"
           viewBox="0 0 120 150"
           style={{

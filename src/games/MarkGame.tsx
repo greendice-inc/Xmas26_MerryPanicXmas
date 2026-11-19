@@ -14,6 +14,9 @@ export const MARKS = [
   { id: 'snow', label: '雪の結晶', image: `${MARK_DIR}mark4.webp`, answer: 0 },
   { id: 'bolt', label: '雷', image: `${MARK_DIR}mark5.webp`, answer: 1 },
 ] as const
+/** ナゾの入力画面での並び：太陽・雷・傘・雲・雪（点数の大きい順にはしない）。記録や子ども部屋は MARKS の並びのまま */
+const INPUT_ORDER: MarkId[] = ['sun', 'bolt', 'umbrella', 'cloud', 'snow']
+const INPUT_MARKS = INPUT_ORDER.map((id) => MARKS.find((m) => m.id === id)!)
 /** 全マークの答え（シーンジャンプ・強制クリアで使う） */
 export const ALL_MARK_SCORES: Record<string, number> = Object.fromEntries(MARKS.map((m) => [m.id, m.answer]))
 /** ゲーム1の背景 */
@@ -45,7 +48,7 @@ export default function MarkGame({ onClear, solved: allDone, scores, onScore }: 
   const [inputs, setInputs] = useState<Record<MarkId, string>>(() =>
     toInputs(allDone ? ALL_SOLVED : ((scores ?? {}) as Partial<Record<MarkId, number>>)),
   )
-  const [selected, setSelected] = useState<MarkId | null>(allDone ? null : MARKS[0].id)
+  const [selected, setSelected] = useState<MarkId | null>(allDone ? null : INPUT_MARKS[0].id)
   const [guide, setGuide] = useState<Guide>('start')
   const mark = useGameLines('st1-mark')
   // 間違っているときは、何度目でも「マーク当て：1回目の不正解」のセリフ
@@ -109,8 +112,8 @@ export default function MarkGame({ onClear, solved: allDone, scores, onScore }: 
   /** 「次へ」：右どなりの欄へ（最後の欄なら最初へ） */
   const next = () => {
     if (!selected) return
-    const i = MARKS.findIndex((m) => m.id === selected)
-    setSelected(MARKS[(i + 1) % MARKS.length].id)
+    const i = INPUT_MARKS.findIndex((m) => m.id === selected)
+    setSelected(INPUT_MARKS[(i + 1) % INPUT_MARKS.length].id)
   }
 
   // 「消す」を長押しすると、選んでいる欄を全部消す
@@ -147,7 +150,7 @@ export default function MarkGame({ onClear, solved: allDone, scores, onScore }: 
       <div className="mark-body">
        <div className="mark-panel is-five">
         <div className="mark-row">
-          {MARKS.map((m, i) => (
+          {INPUT_MARKS.map((m, i) => (
             <button
               key={m.id}
               className={`mark-cell${selected === m.id ? ' is-selected' : ''}${inputs[m.id] !== '' ? ' is-filled' : ''}`}

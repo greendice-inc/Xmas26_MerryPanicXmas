@@ -114,6 +114,8 @@ export default function PlayerScreen({ team }: { team: number }) {
   const [recordsOpen, setRecordsOpen] = useState(false)
   // ステージ4 ROUND1 の説明で、取り出し依頼ボタンを光らせる
   const [requestGlow, setRequestGlow] = useState(false)
+  // ステージ4：ROUND1「とりよせのあと」の説明が始まったか（「エルフに取り出し依頼」ボタンは、ここから出す）
+  const [bingoOrderTalk, setBingoOrderTalk] = useState(false)
   // ステージ4：エルフ・ロビンが話している間は、下のボタンを押せない
   const [bingoLock, setBingoLock] = useState(false)
   // ステージ2の案内で目立たせる場所
@@ -414,6 +416,7 @@ export default function PlayerScreen({ team }: { team: number }) {
             })
           }
           onRequestGlow={setRequestGlow}
+          onOrderTalk={setBingoOrderTalk}
           // 「アイテムが届きました」を閉じたあと、ROUND1 の取り出し依頼の説明が始まる
           arrived={arrivedSeenAt === (doc.order?.at ?? null)}
           onLock={setBingoLock}
@@ -641,6 +644,13 @@ export default function PlayerScreen({ team }: { team: number }) {
       setRecordsOpen(false)
     }
   }, [talking, markQuiz])
+  // 「エルフに取り出し依頼」ボタン：ステージ4の ROUND1「とりよせのあと」の説明が始まってから出す。いちど出たら、そのあと（LAST まで）はずっと出す
+  const bingoNow = doc.bingo ?? DEFAULT_BINGO
+  const requestShown =
+    doc.stage > BINGO_STAGE ||
+    doc.phase === 'end' ||
+    (doc.stage === BINGO_STAGE &&
+      (doc.phase === 'clear' || bingoOrderTalk || bingoNow.orderTold != null || bingoNow.deckIn || bingoNow.step === 'r2' || bingoNow.step === 'done'))
   return (
     <div className="screen player">
       {debugMode && debugKey && <div className="debug-sockkey">{debugKey}</div>}
@@ -658,8 +668,8 @@ export default function PlayerScreen({ team }: { team: number }) {
                 tab={szTab}
                 onTab={setSzTab}
                 searchUnlocked={!!doc.searchUnlocked || doc.stage > HIDE_STAGE}
-                // 取り出し依頼ボタンはステージ4から、ずっと出す
-                onRequest={doc.stage >= BINGO_STAGE ? onRequest : undefined}
+                // 取り出し依頼ボタンは、ステージ4の ROUND1「とりよせのあと」から、ずっと出す（requestShown）
+                onRequest={requestShown ? onRequest : undefined}
                 // 届いた注文のナゾ（閉じていても、ここから開き直せる）
                 onOpenProblem={openProblemOverShop}
                 sockGlow={sockGlow}

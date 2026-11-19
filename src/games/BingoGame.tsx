@@ -166,6 +166,8 @@ interface Props {
   onDone: () => void
   /** ROUND1 の説明で、Santazon の「エルフに取り出し依頼」ボタンを光らせる */
   onRequestGlow?: (on: boolean) => void
+  /** ROUND1「とりよせのあと」の説明が始まった・終わった（「エルフに取り出し依頼」ボタンは、ここから出す） */
+  onOrderTalk?: (on: boolean) => void
   /** エルフ・ロビンが話している間（チュートリアルの間も）は、下のボタンを押せなくする */
   onLock?: (locked: boolean) => void
   /** 注文が届いて、「アイテムが届きました」を閉じた */
@@ -173,7 +175,7 @@ interface Props {
 }
 
 /** ステージ4：カタカナビンゴ。チュートリアル → ROUND1 → ROUND2 */
-export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone, onRequestGlow, onLock, arrived }: Props) {
+export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone, onRequestGlow, onOrderTalk, onLock, arrived }: Props) {
   const { products } = useProducts()
   const bingo: BingoProgress = { ...DEFAULT_BINGO, ...doc.bingo }
   const bingoRef = useRef(bingo)
@@ -305,6 +307,11 @@ export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone,
     return () => onLock?.(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy])
+  useEffect(() => {
+    onOrderTalk?.(orderTalk)
+    return () => onOrderTalk?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderTalk])
   const requestGlow = !!orderLine && orderLine.id === 'request'
   useEffect(() => {
     onRequestGlow?.(requestGlow)
