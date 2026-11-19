@@ -108,11 +108,12 @@ export const PROBLEMS: Record<CategoryKey, Problem> = {
 
 /**
  * ソックスキーの番号（宅配ソックスの番号。ナゾの答えも、取り出し依頼で入れる番号も、これ）。
- * 注文した商品の4桁のアイテム番号を、桁ごとに足す。桁があふれたら一の位だけ使う。
- * 例：a-b-c-d と e-f-g-h を注文 → (a+e)(b+f)(c+g)(d+h)
+ * 注文した商品のアイテム番号を、それぞれ4ケタの数として足した合計（4ケタ。あふれたら下4ケタ）。
+ * 例：3139 と 2867 を注文 → 6006
  */
 export function sockKeyOf(codes: string[]): string {
-  return [0, 1, 2, 3].map((i) => codes.reduce((sum, c) => sum + (Number(c[i]) || 0), 0) % 10).join('')
+  const sum = codes.reduce((s, c) => s + (Number(c) || 0), 0)
+  return String(sum % 10000).padStart(4, '0')
 }
 
 /** 注文（カート）の中身から、ソックスキーの番号を出す。商品は、いまのアイテム番号（Firestore の値）を使う */
