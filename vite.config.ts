@@ -15,4 +15,6 @@ const updatedAt = new Intl.DateTimeFormat('ja-JP', {
 export default defineConfig({
   plugins: [react()],
   define: { __UPDATED_AT__: JSON.stringify(updatedAt) },
+  // VS Code のポート転送（*.devtunnels.ms）など、外からのアクセスで「Blocked request」にならないようにする
+  server: { allowedHosts: ['.devtunnels.ms', '.trycloudflare.com'] },
 })
