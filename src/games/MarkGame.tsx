@@ -21,36 +21,43 @@ const MARK_BG = `${MARK_DIR}1st_back_1.webp`
 
 type MarkId = (typeof MARKS)[number]['id']
 
-/** 入力できる最大桁数 */
-const MAX_DIGITS = 9
+/** 1つの欄に入力できる最大桁数 */
+const MAX_DIGITS = 3
+/** 5つとも正しく埋まってから、次のセリフに進むまでの間（打ち終わった数字が見えるように） */
+const JUDGE_DELAY = 600
+/** 5つ埋まって間違っているとき、不正解のセリフを出すまでの間（「1」→「10」のように打っている途中で出さないよう、長めに待つ） */
+const WRONG_DELAY = 1500
 
 /** 案内役のエルフの台詞の種類。台詞は script/gameScenes.ts（セリフ編集の「マーク当て中」など） */
-type Guide = 'start' | 'picking' | 'wrongFirst' | 'wrong' | 'right' | 'done'
+type Guide = 'start' | 'wrong' | 'done'
 
 const ALL_SOLVED = Object.fromEntries(MARKS.map((m) => [m.id, m.answer])) as Partial<Record<MarkId, number>>
+const toInputs = (s: Partial<Record<MarkId, number>>) =>
+  Object.fromEntries(MARKS.map((m) => [m.id, s[m.id] !== undefined ? String(s[m.id]) : ''])) as Record<MarkId, string>
 
+/**
+ * 5つのマークそれぞれの下に入力欄がある。欄を選んでテンキーで数字を入れると、その欄に残る（1問ずつの判定はしない）。
+ * 5つとも埋まった時点で裏で答え合わせをして、全部正しければ次のセリフへ。違っていれば不正解のセリフ
+ */
 export default function MarkGame({ onClear, solved: allDone, scores, onScore }: GameProps) {
   // ?debug=true のときは、答えを左に出す
   const debug = new URLSearchParams(location.search).get('debug') === 'true'
-  const [solved, setSolved] = useState<Partial<Record<MarkId, number>>>(allDone ? ALL_SOLVED : ((scores ?? {}) as Partial<Record<MarkId, number>>))
-  const [selected, setSelected] = useState<MarkId | null>(null)
-  const [input, setInput] = useState('')
+  const [inputs, setInputs] = useState<Record<MarkId, string>>(() =>
+    toInputs(allDone ? ALL_SOLVED : ((scores ?? {}) as Partial<Record<MarkId, number>>)),
+  )
+  const [selected, setSelected] = useState<MarkId | null>(allDone ? null : MARKS[0].id)
   const [guide, setGuide] = useState<Guide>('start')
   const mark = useGameLines('st1-mark')
-  const missFirst = useGameLines('st1-mark-miss1')
-  const miss = useGameLines('st1-mark-miss')
-  // mark-start=最初・選んだとき / mark-right=正解 / mark-done=全部わかった（マーク当て中）、不正解は別の場面
+  // 間違っているときは、何度目でも「マーク当て：1回目の不正解」のセリフ
+  const miss = useGameLines('st1-mark-miss1')
+  // mark-start=最初 / mark-done=全部わかった（マーク当て中）
   const one = (id: string) => mark.filter((l) => l.id === id)
   const GUIDE: Record<Guide, typeof mark> = {
     start: one('mark-start'),
-    picking: one('mark-start'),
-    right: one('mark-right'),
-    done: one('mark-done'),
-    wrongFirst: missFirst,
     wrong: miss,
+    done: one('mark-done'),
   }
   const [guideIdx, setGuideIdx] = useState(0)
-  const missed = useRef(false)
   const say = (g: Guide) => {
     setGuide(g)
     setGuideIdx(0)
@@ -59,74 +66,66 @@ export default function MarkGame({ onClear, solved: allDone, scores, onScore }: 
   const onClearRef = useRef(onClear)
   onClearRef.current = onClear
 
-  // 隠しメニューの「ゲームを強制クリア」：各マークに正解を自動で入力する（そのあとは、ふつうに解いたときと同じ流れ）
+  // 隠しメニューの「ゲームを強制クリア」：各欄に正解を自動で入力する（そのあとは、ふつうに解いたときと同じ流れ）
   useEffect(() => {
     const force = () => {
-      Object.entries(ALL_SOLVED).forEach(([id, a]) => onScore?.(id, a as number))
-      setSolved(ALL_SOLVED)
+      setInputs(toInputs(ALL_SOLVED))
       setSelected(null)
-      setInput('')
     }
     window.addEventListener('mpx:force-clear', force)
     return () => window.removeEventListener('mpx:force-clear', force)
   }, [])
 
-  const allSolved = MARKS.every((m) => solved[m.id] !== undefined)
+  const allFilled = MARKS.every((m) => inputs[m.id] !== '')
+  const allRight = allFilled && MARKS.every((m) => Number(inputs[m.id]) === m.answer)
 
+  // 5つ埋まったら裏で答え合わせ（判定ボタンはない）。全部正しければ次へ、違えば不正解のセリフ。少し待つあいだに書き換えたら、やり直し
   useEffect(() => {
-    if (!allSolved || allDone) return
-    say('done')
+    if (!allFilled || allDone || cleared.current) return
+    if (!allRight) {
+      const t = setTimeout(() => say('wrong'), WRONG_DELAY)
+      return () => clearTimeout(t)
+    }
     const t = setTimeout(() => {
       if (cleared.current) return
       cleared.current = true
-      onClearRef.current()
-    }, 1500)
+      MARKS.forEach((m) => onScore?.(m.id, m.answer))
+      setSelected(null)
+      say('done')
+      setTimeout(() => onClearRef.current(), 1500)
+    }, JUDGE_DELAY)
     return () => clearTimeout(t)
-  }, [allSolved])
+  }, [inputs])
 
+  const locked = allDone || cleared.current
   const pick = (id: MarkId) => {
-    if (solved[id] !== undefined) return
+    if (locked) return
     setSelected(id)
-    setInput('')
-    // マークを選んでも、吹き出しは変えない（「その調子！」などが出ていれば、そのまま）
   }
-
-  const press = (key: string) => {
+  const edit = (f: (v: string) => string) => {
+    if (!selected || locked) return
+    setInputs((s) => ({ ...s, [selected]: f(s[selected]) }))
+  }
+  /** 「次へ」：右どなりの欄へ（最後の欄なら最初へ） */
+  const next = () => {
     if (!selected) return
-    if (key === 'DEL') setInput((v) => v.slice(0, -1))
-    else if (key === 'OK') confirm()
-    else setInput((v) => (v.length < MAX_DIGITS ? v + key : v))
+    const i = MARKS.findIndex((m) => m.id === selected)
+    setSelected(MARKS[(i + 1) % MARKS.length].id)
   }
 
-  // 「消す」を長押しすると、入力を全部消す
+  // 「消す」を長押しすると、選んでいる欄を全部消す
   const delTimer = useRef<number | null>(null)
   const delLong = useRef(false)
   const delDown = () => {
     delLong.current = false
     delTimer.current = window.setTimeout(() => {
       delLong.current = true
-      setInput('')
+      edit(() => '')
     }, 600)
   }
   const delUp = () => {
     if (delTimer.current != null) window.clearTimeout(delTimer.current)
     delTimer.current = null
-  }
-
-  const confirm = () => {
-    if (!selected || input === '') return
-    const mark = MARKS.find((m) => m.id === selected)!
-    if (Number(input) === mark.answer) {
-      setSolved((s) => ({ ...s, [selected]: mark.answer }))
-      onScore?.(selected, mark.answer)
-      setSelected(null)
-      setInput('')
-      say('right')
-    } else {
-      setInput('')
-      say(missed.current ? 'wrong' : 'wrongFirst')
-      missed.current = true
-    }
   }
 
   const speak = GUIDE[guide][Math.min(guideIdx, GUIDE[guide].length - 1)]
@@ -146,43 +145,32 @@ export default function MarkGame({ onClear, solved: allDone, scores, onScore }: 
         </ul>
       )}
       <div className="mark-body">
-       <div className="mark-panel">
-        <div className="mark-grid">
-          {MARKS.map((m) => {
-            const answer = solved[m.id]
-            return (
-              <div key={m.id} className="mark-slot">
-                <span className="mark-score">{answer !== undefined ? answer : ''}</span>
-                <button
-                  className={`mark-btn${selected === m.id ? ' is-selected' : ''}${answer !== undefined ? ' is-solved' : ''}`}
-                  aria-label={m.label}
-                  disabled={answer !== undefined}
-                  onClick={() => pick(m.id)}
-                >
-                  <img className="mark-img" src={m.image} alt="" draggable={false} />
-                </button>
-              </div>
-            )
-          })}
+       <div className="mark-panel is-five">
+        <div className="mark-row">
+          {MARKS.map((m, i) => (
+            <button
+              key={m.id}
+              className={`mark-cell${selected === m.id ? ' is-selected' : ''}${inputs[m.id] !== '' ? ' is-filled' : ''}`}
+              aria-label={`${i + 1}問目 ${m.label}`}
+              onClick={() => pick(m.id)}
+            >
+              <img className="mark-img" src={m.image} alt="" draggable={false} />
+              <span className="mark-input" aria-live="polite">{inputs[m.id]}</span>
+            </button>
+          ))}
         </div>
-        <div className="mark-entry">
-          {/* 入力欄：区切りのない1つの枠（ソックスキーのナゾの枠と同じ色づかい） */}
-          <div className={`mark-answer${selected ? ' is-cur' : ''}`} aria-live="polite">
-            {input}
-          </div>
-          {/* テンキーは、ソックスキーのナゾと同じ部品（大きさ・見た目が同じ） */}
-          <TenKeyPad
-            className={`mark-keypad${selected ? '' : ' is-idle'}`}
-            disabled={!selected}
-            okDisabled={input === ''}
-            onKey={(d) => press(d)}
-            onDelete={() => {
-              if (!delLong.current) press('DEL')
-            }}
-            onOk={() => press('OK')}
-            deleteProps={{ onPointerDown: delDown, onPointerUp: delUp, onPointerLeave: delUp }}
-          />
-        </div>
+        {/* テンキーは、ソックスキーのナゾと同じ部品（大きさ・見た目が同じ）。OK の代わりに「次へ」で右の欄に移る */}
+        <TenKeyPad
+          className={`mark-keypad${selected && !locked ? '' : ' is-idle'}`}
+          disabled={!selected || locked}
+          okLabel="次へ"
+          onKey={(d) => edit((v) => (v.length < MAX_DIGITS ? v + d : v))}
+          onDelete={() => {
+            if (!delLong.current) edit((v) => v.slice(0, -1))
+          }}
+          onOk={next}
+          deleteProps={{ onPointerDown: delDown, onPointerUp: delUp, onPointerLeave: delUp }}
+        />
        </div>
       </div>
       {/* すべて分かったあとは、続きの説明（画面の上に出る会話）に任せる */}

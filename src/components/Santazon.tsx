@@ -83,7 +83,7 @@ const CAT_TABS: { key: CategoryKey; img: string; label: string; from: number }[]
 ]
 
 export type SzTab = 'list' | 'search'
-/** tab=リスト追加検索タブを目立たせる / talk=説明中（どこも触れない） / drag2=「2」を枠へドラッグしてもらう（「2」と枠と検索と結果の閉じるだけ触れる） / searched=リスト画面で「登録済みアイテム」を矢印で示す（どこも触れない） */
+/** tab=リスト追加検索タブを目立たせる / talk=説明中（どこも触れない） / drag2=マネキンの番号を1文字ずつ枠へドラッグしてもらう（その数字と枠と検索と結果の閉じるだけ触れる） / searched=リスト画面で「登録済みアイテム」を矢印で示す（どこも触れない） */
 export type SzGuide = 'tab' | 'talk' | 'drag2' | 'searched'
 
 /** リスト追加検索で、検索済みリストに載せてよい商品（名前が一致するか、前方一致） */
@@ -621,6 +621,7 @@ function SearchTab({
   const rootRef = useRef<HTMLDivElement>(null)
 
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null, null])
+  const emptyIdx = slots.findIndex((v) => v === null)
   const [drag, setDrag] = useState<{ digit: string; x: number; y: number } | null>(null)
   const [result, setResult] = useState<Product[] | 'none' | null>(null)
 
@@ -645,7 +646,8 @@ function SearchTab({
       .elementsFromPoint(e.clientX, e.clientY)
       .find((el): el is HTMLElement => el instanceof HTMLElement && el.dataset.slot !== undefined)
     if (hit) {
-      const idx = Number(hit.dataset.slot)
+      // 案内中は、指している枠（左から順）に入れる
+      const idx = guide === 'drag2' && emptyIdx >= 0 ? emptyIdx : Number(hit.dataset.slot)
       setSlots((s) => s.map((v, i) => (i === idx ? drag.digit : v)))
       setResult(null)
     }
@@ -654,12 +656,12 @@ function SearchTab({
 
   const filled = slots.every((s) => s !== null)
 
-  // 「2」を枠へドラッグするところを、矢印でくり返し見せる（座標はこの画面の中）
+  // マネキンのアイテム番号の、次に入れる数字を枠へドラッグするところを、矢印でくり返し見せる（座標はこの画面の中）
   const [arrow, setArrow] = useState<{ sx: number; sy: number; ex: number; ey: number } | null>(null)
-  const emptyIdx = slots.findIndex((v) => v === null)
+  const guideDigit = (products.find((p) => p.name === 'マネキン')?.code ?? '')[emptyIdx] ?? null
   useLayoutEffect(() => {
     const root = rootRef.current
-    const from = root?.querySelector<HTMLElement>('.sz-panel[aria-label="2"]')
+    const from = guideDigit ? root?.querySelector<HTMLElement>(`.sz-panel[aria-label="${guideDigit}"]`) : null
     const to = emptyIdx >= 0 ? root?.querySelector<HTMLElement>(`.sz-slot[data-slot="${emptyIdx}"]`) : null
     if (guide !== 'drag2' || !root || !from || !to) return setArrow(null)
     const r = root.getBoundingClientRect()
@@ -671,7 +673,7 @@ function SearchTab({
     const a = at(from)
     const b = at(to)
     setArrow({ sx: a.x, sy: a.y, ex: b.x, ey: b.y })
-  }, [guide, emptyIdx])
+  }, [guide, emptyIdx, guideDigit])
   const search = () => {
     const code = slots.join('')
     // 文字を並べたときだけの特別な検索（番号は要らない）
@@ -754,7 +756,7 @@ function SearchTab({
         {DIGITS.map((d) => (
           <button
             key={d}
-            className={`sz-panel${guide === 'drag2' && d === '2' ? ' is-guide' : ''}`}
+            className={`sz-panel${guide === 'drag2' && d === guideDigit ? ' is-guide' : ''}`}
             aria-label={d}
             onPointerDown={down(d)} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
             <img src={SZ.num(d)} alt="" draggable={false} />

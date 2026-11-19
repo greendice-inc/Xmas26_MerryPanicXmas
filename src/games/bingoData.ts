@@ -1,4 +1,4 @@
-import type { Product } from '../santazon/products'
+import { SOCK_KEY_IMAGE, type Product } from '../santazon/products'
 import type { BingoStep, OrderItem } from '../types'
 
 /**
@@ -104,7 +104,8 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
       { name: 'ハンカチ', n: 1, label: 'ハンカチ1枚' },
     ],
     order: ['グラス', 'マッチ', 'ハンカチ'],
-    problem: { request: true },
+    // C：ビンゴ ラウンド1のカードの注文
+    problem: { request: true, image: SOCK_KEY_IMAGE('c') },
   },
   r2: {
     adult: card('ウナヘ', 'ギアラ', 'カルク'),
@@ -121,8 +122,9 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
       { name: 'ユビワ', n: 1 },
       { name: 'サッカーボール', n: 7 },
     ],
-    order: ['ヘビ', 'ユビワ', 'サッカーボール'],
-    problem: { request: true },
+    order: ['ヘビ', 'ゆびわ', 'サッカーボール'],
+    // D：ビンゴ ラウンド2のカードの注文
+    problem: { request: true, image: SOCK_KEY_IMAGE('d') },
   },
 }
 

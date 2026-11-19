@@ -6,6 +6,7 @@ import { useGameLines } from '../script/scriptData'
 import { backgroundImage, JACK_ICON, st3GameImage, STF_NAME } from '../scenario'
 import { DEFAULT_LAST, type LastProgress, type TeamDoc } from '../types'
 import { LAST_ADULT_POINTS, LAST_KID_POINTS } from './lastData'
+import { SOCK_KEY_IMAGE } from '../santazon/products'
 import { ASPECT, WORD_GAMES, WordBoard } from './WordGame'
 import { useWordAreas } from './wordAreas'
 
@@ -28,8 +29,9 @@ function nextCountDelay(n: number): number {
   const base = (n % 2 === 0 ? COUNT_LONG_MS : COUNT_SHORT_MS) * ratio
   return Math.round(base + (Math.random() * 2 - 1) * COUNT_JITTER_MS * ratio)
 }
-/** ジャック機能で見える、ルドリーの注文ナゾ（画像が来たら public 配下のパスを入れる） */
-const KID_PROBLEM_IMAGE: string | undefined = undefined
+/** ジャック機能で見える、ルドリーの注文ナゾ */
+// E：ジャック機能で見るルドリーの画面に出ているナゾ
+const KID_PROBLEM_IMAGE: string | undefined = SOCK_KEY_IMAGE('e')
 
 /** 画面の外（注文ボタン）まで覆うため、会話などはプレイヤー画面の上に出す */
 function usePortal() {

@@ -99,6 +99,7 @@ export const SCENES: SceneDef[] = [
   game('st1-mark-miss', 'Stage1', 'マーク当て：2回目からの不正解', G.ST1_MARK_MISS, { noPos: true }),
   game('st1-rules', 'Stage1', 'マーク当てのあと（Santazonの説明）', G.ST1_RULES),
   game('st1-sock', 'Stage1', '正しい注文のあと（ソックスキー）', G.ST1_SOCK),
+  { id: 'st1-clear', tab: 'Stage1', label: 'クリア後', base: CLEAR[0] },
   { id: 'st2-intro', tab: 'Stage2', label: '導入', base: NOVEL[1] },
   game('st2-tutorial', 'Stage2', 'リスト追加検索の案内', G.ST2_TUTORIAL),
   game('st2-miss', 'Stage2', '違う場所を選んだとき', G.ST2_MISS),

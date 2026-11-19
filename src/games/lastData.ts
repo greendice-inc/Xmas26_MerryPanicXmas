@@ -1,4 +1,4 @@
-import type { Product } from '../santazon/products'
+import { SOCK_KEY_IMAGE, type Product } from '../santazon/products'
 import type { LastStep, OrderItem } from '../types'
 
 /**
@@ -20,7 +20,8 @@ export const LAST_KID_POINTS = 250
 
 /** 注文のあとに出す問題の画像など（答えは、注文の中身から計算する：products.ts の sockKeyOf） */
 export const LAST_PROBLEMS: Partial<Record<LastStep, { image?: string }>> = {
-  balls: {},
+  // F：エントツ（エントツとボール2種の注文）
+  balls: { image: SOCK_KEY_IMAGE('f') },
   super: {},
 }
 

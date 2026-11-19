@@ -426,61 +426,14 @@ export const ENDING: NovelScene = {
 }
 
 /** ステージ1の導入のあとの、エルフと子供の会話 */
+/** ステージ1のクリア後（小部屋から戻って、スタッフの「次へ」のあと） */
 const STAGE1_CLEAR: NovelScene = {
   character: 'Stage1',
   background: 'Stage1',
   lines: [
-    { speaker: 'エルフ', character: 'Common', text: '無事特定できたみたいですね。', emotion: '真顔' },
-    { speaker: '子供', text: 'やったー！いちおくポイントゲット！', emotion: '楽' },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: 'どうやらリンはもうリングデマークを終えちゃったみたいです。一億ポイントもゲットできるマークはないはずですが・・・',
-      emotion: '真顔',
-    },
-    { speaker: '', text: '', banner: 'リン１ポイント' },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: 'やっぱり…1億点取ったと思い込んでいるみたいです。このままだと、ゲームに負けることができないですね…',
-      emotion: '哀',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: 'そうだ！Santazonを使いましょう！Santazonを使うと、勝負に必要なアイテムを購入することができるんです！',
-      emotion: '楽',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: 'タブレットの左下にある注文ボタンを押すとSantazonのページを開くことができます。',
-      emotion: '真顔',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: '必要なアイテムを3つまでカートに追加して、注文確定ボタンを押すと注文したものが宅配ソックスに届きます。',
-      emotion: '真顔',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: '宅配ソックスの番号は、注文した後に出てくる謎を解くとわかるようになってます！',
-      emotion: '真顔',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: '詳しい説明はSantazonページのSantazonの使い方。ボタンを押してみてください。',
-      emotion: '真顔',
-    },
-    {
-      speaker: 'エルフ',
-      character: 'Common',
-      text: 'では、Santazonを使ってゲームに負ける方法を考えてください！',
-      emotion: '楽',
-    },
+    { speaker: 'エルフ', character: 'Common', text: '両方のわなげが終了しました。\n結果は……子どもチームの勝利です！', emotion: '楽' },
+    { speaker: 'リン', text: 'やった～！\nやっぱり私はわなげが得意なんだよね～！\nあー楽しかった、バイバーイ！', emotion: '喜' },
+    { speaker: 'エルフ', character: 'Common', text: '笑顔で帰ってくれて、よかったですね。\nそれでは次のゲームに進みましょう。', emotion: '楽' },
   ],
 }
 

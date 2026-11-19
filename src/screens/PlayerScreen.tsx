@@ -237,6 +237,8 @@ export default function PlayerScreen({ team }: { team: number }) {
     const stage = stageRef.current
     // ステージ3は、部屋から戻ったあとにクリアの会話がある
     if (stage === WORD_STAGE && doc.phase !== 'clear') update({ phase: 'clear' })
+    // ステージ1は、小部屋から戻ったら、暗くしてからクリアの会話（END）へ
+    else if (stage === 1 && doc.phase !== 'clear') fadeThen(() => update({ phase: 'clear' }))
     // ステージが切り替わるときは、暗くしてから切り替えて、フェードインで戻す
     else if (stage >= GAME_COUNT) fadeThen(() => update({ phase: 'end' }))
     else fadeThen(() => update({ stage: stage + 1, phase: 'novel' }))
@@ -450,9 +452,8 @@ export default function PlayerScreen({ team }: { team: number }) {
         key={`c${doc.stage}`}
         scene={edited ?? CLEAR[doc.stage - 1]}
         onFinish={() => {
-          if (doc.stage === 1) update({ phase: 'game', markCleared: true })
-          // ステージ2・3は、会話のあとに「タップで次のステージに進む」を出す
-          if (doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE) setClearNext(doc.stage)
+          // ステージ1・2・3は、会話のあとに「タップで次のステージに進む」を出す
+          if (doc.stage === 1 || doc.stage === HIDE_STAGE || doc.stage === WORD_STAGE) setClearNext(doc.stage)
           // LAST：マスターエルフの話のあと、ルドリーのための注文に戻る
           if (doc.stage === LAST_STAGE) update({ phase: 'game' })
         }}
@@ -486,12 +487,12 @@ export default function PlayerScreen({ team }: { team: number }) {
     (lastStep != null && doc.phase === 'game' && (lastStep === 'extract' || lastStep === 'notice'))
   // ステージ1のリンのキモチは、マークが始まったときから記録に入る（保存はせず、いまの位置から決める）
   const markStarted = doc.started && (doc.stage > 1 || doc.phase === 'game' || doc.phase === 'clear' || doc.phase === 'end')
-  // そのステージを終えたか（まとめを載せる）。ステージ1のクリア後の会話はマークのあとなので、次のステージに進んでから
+  // そのステージを終えたか（まとめを載せる）。クリア後の会話に入ったら終えたと見る
   const lastNow = doc.last?.step ?? 'basket'
   const passed = (st: number) =>
     doc.phase === 'end' ||
     doc.stage > st ||
-    (doc.stage === st && st !== 1 && doc.phase === 'clear') ||
+    (doc.stage === st && doc.phase === 'clear') ||
     (st === LAST_STAGE && doc.stage === st && (lastNow === 'notice' || lastNow === 'super'))
   // 子どものキモチは、ゲームでキモチが分かったところから載る（前は「やるべきこと」に出していたのと同じところ）
   const moodShown = {
@@ -757,7 +758,7 @@ export default function PlayerScreen({ team }: { team: number }) {
             <div className="stage-next" onClick={lastStep === 'balls' ? toNotice : goNext}>
               <div className="stage-next-row">
                 <i>▼</i>
-                <span>タップで次のステージに進む</span>
+                <span>{doc.stage === 1 ? 'タップで次に進む' : 'タップで次のステージに進む'}</span>
                 <i>▼</i>
               </div>
             </div>

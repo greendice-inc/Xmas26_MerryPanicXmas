@@ -1866,3 +1866,20 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 /* やるべきこと：見出し（大きく、まんなか）と本文 */
 .task-modal .task-title { margin: 0; white-space: pre-line; font-size: 60px; font-weight: 900; line-height: 1.4; text-align: center; color: var(--ink); }
 .task-modal .task-body { margin: 10px 0 0; white-space: pre-line; font-size: 38px; font-weight: 700; line-height: 1.65; color: var(--ink); }
+
+/* マーク（5か所に入力）：左に5つのマークを横一列、それぞれの下に入力欄。右にテンキー */
+.mark-panel.is-five { gap: 64px; padding: 48px 56px; }
+.mark-row { display: flex; gap: 22px; }
+.mark-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 14px; width: 184px; padding: 10px 0 14px;
+  background: none; border: 0; border-radius: 18px; box-shadow: none; cursor: pointer;
+}
+.mark-cell .mark-img { width: 164px; height: 164px; border-radius: 0; }
+.mark-input {
+  width: 164px; height: 104px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  font-family: 'Line', sans-serif; font-size: 64px; font-weight: 900; color: var(--ink); white-space: nowrap; overflow: hidden;
+  background: #f4f4f5; border-bottom: 6px solid #c4c4cc; border-radius: 12px 12px 4px 4px;
+}
+.mark-cell.is-selected { background: #eaf4fd; box-shadow: inset 0 0 0 5px #1485e0; }
+.mark-cell.is-selected .mark-input { background: #fff; border-bottom-color: #1485e0; }
+.mark-cell:active .mark-img { transform: translateY(4px); }
