@@ -1518,14 +1518,14 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 /* 案内中（ステージ2）は、目立たせたところ以外は触れない */
 .santazon.is-guided.is-drag2 .sz-slot, .santazon.is-guided .sz-panel.is-guide { pointer-events: auto; }
 .santazon .sz-search-actions button.is-guide { animation: guide-glow .7s ease-in-out infinite alternate; }
-/* 「2」から枠へ、ドラッグするように矢印が動く（先が「2」の中心から、空いている枠の中心へ） */
-.sz-drag-arrow { position: absolute; z-index: 72; width: 120px; height: 150px; overflow: visible; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); animation: sz-drag-move 1.8s ease-in-out infinite; }
+/* 次に入れる数字から枠へ、ドラッグするように矢印が動く（先が数字の中心から、空いている枠の中心へ）。先は動く向き（--rot）に向ける */
+.sz-drag-arrow { position: absolute; z-index: 72; width: 120px; height: 150px; overflow: visible; pointer-events: none; transform-origin: 60px 6px; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); animation: sz-drag-move 1.8s ease-in-out infinite; }
 @keyframes sz-drag-move {
-  0% { transform: translate(0, 0); opacity: 0; }
-  12% { transform: translate(0, 0); opacity: 1; }
-  70% { transform: translate(var(--dx), var(--dy)); opacity: 1; }
-  88% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
-  100% { transform: translate(0, 0); opacity: 0; }
+  0% { transform: translate(0, 0) rotate(var(--rot, 0deg)); opacity: 0; }
+  12% { transform: translate(0, 0) rotate(var(--rot, 0deg)); opacity: 1; }
+  70% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot, 0deg)); opacity: 1; }
+  88% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot, 0deg)); opacity: 0; }
+  100% { transform: translate(0, 0) rotate(var(--rot, 0deg)); opacity: 0; }
 }
 .santazon.is-guided .sz-cat, .santazon.is-guided .sz-item-btn, .santazon.is-guided .sz-panel, .santazon.is-guided .sz-hint-ch { pointer-events: none; }
 .santazon.is-guided.is-drag2 .sz-slot, .santazon.is-guided .sz-panel.is-guide { pointer-events: auto; }

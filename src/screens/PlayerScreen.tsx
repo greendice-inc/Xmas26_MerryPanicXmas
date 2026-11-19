@@ -239,9 +239,10 @@ export default function PlayerScreen({ team }: { team: number }) {
     if (stage === WORD_STAGE && doc.phase !== 'clear') update({ phase: 'clear' })
     // ステージ1は、小部屋から戻ったら、暗くしてからクリアの会話（END）へ
     else if (stage === 1 && doc.phase !== 'clear') fadeThen(() => update({ phase: 'clear' }))
-    // ステージが切り替わるときは、暗くしてから切り替えて、フェードインで戻す
+    // ステージが切り替わるときは、暗くしてから切り替えて、フェードインで戻す。
+    // 前のステージの注文は消す（残すと、ステージ1の「解けた」注文のせいで、ステージ3がいきなりイスの場面になる）
     else if (stage >= GAME_COUNT) fadeThen(() => update({ phase: 'end' }))
-    else fadeThen(() => update({ stage: stage + 1, phase: 'novel' }))
+    else fadeThen(() => update({ stage: stage + 1, phase: 'novel', order: null }))
   }
 
   // ステージや場面が切り替わったら、「次に進む」の二重タップ防止を戻す（戻さないと、ステージ2のクリア後にタップしても進まない）
@@ -463,7 +464,7 @@ export default function PlayerScreen({ team }: { team: number }) {
             : {
                 label: '次に進む',
                 onClick: () =>
-                  fadeThen(() => (doc.stage >= GAME_COUNT ? update({ phase: 'end' }) : update({ stage: doc.stage + 1, phase: 'novel' }))),
+                  fadeThen(() => (doc.stage >= GAME_COUNT ? update({ phase: 'end' }) : update({ stage: doc.stage + 1, phase: 'novel', order: null }))),
               }
         }
       />

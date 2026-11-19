@@ -792,7 +792,14 @@ function SearchTab({
         <svg
           className="sz-drag-arrow"
           viewBox="0 0 120 150"
-          style={{ left: arrow.sx - 60, top: arrow.sy, ['--sx' as string]: '0px', ['--sy' as string]: '0px', ['--dx' as string]: `${arrow.ex - arrow.sx}px`, ['--dy' as string]: `${arrow.ey - arrow.sy}px` }}
+          style={{
+            left: arrow.sx - 60,
+            top: arrow.sy,
+            ['--dx' as string]: `${arrow.ex - arrow.sx}px`,
+            ['--dy' as string]: `${arrow.ey - arrow.sy}px`,
+            // 矢印の先を、動く向き（数字 → 枠）に向ける。「1」のように横へ大きく動くときも、先が進む方を指す
+            ['--rot' as string]: `${(Math.atan2(arrow.ex - arrow.sx, arrow.sy - arrow.ey) * 180) / Math.PI}deg`,
+          }}
           aria-hidden
         >
           <path d="M38 144h44V74h32L60 6 6 74h32z" fill="#ff8a00" stroke="#2a2a30" strokeWidth="8" strokeLinejoin="round" />
