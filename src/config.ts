@@ -17,8 +17,8 @@ export const KEYBOX_DEFAULTS: Record<number, { id: string; ch: number; ad: numbe
   3: { id: '54554D03', ch: 20, ad: 0x08 },
   4: { id: '54554D03', ch: 20, ad: 0x09 },
 }
-/** キーボックスに入れると開く番号（ひとまず） */
-export const KEYBOX_CODES = ['6476', '2222', '3333']
+/** キーボックスに入れると開く番号。1st・3rd・LAST エントツの正しい注文のソックスキー */
+export const KEYBOX_CODES = ['6006', '3889', '4025']
 /** 解錠してから、自動でもう一度施錠するまでの時間（開けて閉める間。閉じたことを知らせる信号が分かるまでの代わり） */
 export const KEYBOX_RELOCK_MS = 10000
 /** 何秒ボタンが押されなければ、途中までの入力を消すか */
