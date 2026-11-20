@@ -277,7 +277,10 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   // カテゴリのタブ（2nd・5th は商品がないので出さない）。ステージが進むほど増える
   const tabs = CAT_TABS.filter((t) => doc.stage >= t.from)
   const selected = tabs.some((t) => t.key === category) ? category : tabs[tabs.length - 1].key
-  const listed = products.filter((p) => p.category === selected && p.listed)
+  // サプライズアイテムは特別枠なので、いつもリストの一番上に出す（ほかは今までどおりの並び）
+  const listed = products
+    .filter((p) => p.category === selected && p.listed)
+    .sort((a, b) => Number(b.name === SURPRISE_NAME) - Number(a.name === SURPRISE_NAME))
   const searchedProducts = doc.searched.map(productById).filter((p): p is Product => !!p)
   const rows = showSearched ? searchedProducts : listed
   // リストの中身が変わったとき（タブ・カテゴリ・件数）にだけ、スクロールのサインを確かめる。
