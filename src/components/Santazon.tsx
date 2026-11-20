@@ -9,7 +9,7 @@ import {
   type Product,
 } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
-import { isBingoCart, roundOf, SURPRISE_KID_ORDER, SURPRISE_NAME } from '../games/bingoData'
+import { isBingoCart, SURPRISE_NAME, surpriseShipped } from '../games/bingoData'
 
 /** 「注文が確定しました」を自動で閉じるまで。商品が届く（PlayerScreen の DELIVER_MS）より前に閉じる */
 const CONFIRM_MS = 3000
@@ -40,6 +40,8 @@ interface Props {
   onRequest?: (code: string) => RequestResult
   /** 届いた注文のナゾ（宅配ソックスのナゾ）をもう一度開く */
   onOpenProblem?: () => void
+  /** true の間は、ホームボタンで閉じられない */
+  closeLocked?: boolean
   /** 「注文が確定しました」を閉じたとき */
   onConfirmedClose?: () => void
   /** 取り出し依頼ボタンを光らせる（ステージ4 ROUND1 の説明） */
@@ -97,7 +99,7 @@ function ProductImage({ p }: { p: Product }) {
 }
 
 /** 注文画面「Santazon」。見た目はネット通販サイト風 */
-export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem, onConfirmedClose, sockGlow, requestGlow }: Props) {
+export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem, onConfirmedClose, sockGlow, requestGlow, closeLocked }: Props) {
   const { products } = useProducts()
   const productById = (id: string) => products.find((p) => p.id === id)
   const [ownTab, setOwnTab] = useState<SzTab>('list')
@@ -219,10 +221,8 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
   const full = cartCount >= MAX_CART
 
-  // ステージ4：サプライズアイテムは、ロビンがラウンドごとに注文している
-  const bingoRound = doc.stage === 4 ? roundOf(doc.bingo?.step) : null
-  const kidOrdered = (p: Product) =>
-    bingoRound && p.category === 'game4' && p.name === SURPRISE_NAME ? SURPRISE_KID_ORDER * (bingoRound === 'r1' ? 1 : 2) : 0
+  // サプライズアイテムは、子どもたちが発送した分だけ減る（ロビン：ビンゴの各ラウンドで3個、ルドリー：ファイナルゲームの開始時に1個）
+  const kidOrdered = (p: Product) => (p.name === SURPRISE_NAME ? surpriseShipped(doc.stage, LAST_STAGE, doc.bingo?.step) : 0)
   const remaining = (p: Product) =>
     p.available -
     kidOrdered(p) -
@@ -302,7 +302,8 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
       className={`santazon is-${tab}${guide ? ' is-guided' : ''}${guide === 'drag2' ? ' is-drag2' : ''}`}
       style={{ backgroundImage: `url("${tab === 'list' ? SZ.backList : SZ.backSearch}")` }}
     >
-      <button className="sz-home" onClick={onClose} aria-label="ホームに戻る" />
+      {/* 閉じさせない間（ビンゴ ROUND1 の最初の注文から、エルフの説明が終わるまで）は、ホームボタンを出さない */}
+      {!closeLocked && <button className="sz-home" onClick={onClose} aria-label="ホームに戻る" />}
       <button className="sz-help" onClick={() => setHelp(true)}>？ 使い方</button>
       <button className="sz-tab is-list" aria-label="リスト" onClick={() => setTab('list')} />
       {searchUnlocked && (

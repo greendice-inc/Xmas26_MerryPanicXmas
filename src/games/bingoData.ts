@@ -130,9 +130,17 @@ export const ROUNDS: Record<'r1' | 'r2', BingoRound> = {
 
 export const roundOf = (step: BingoStep | undefined): 'r1' | 'r2' | null => (step === 'r1' || step === 'r2' ? step : null)
 
-/** サプライズアイテムの在庫。ロビンがラウンドごとに3つ注文している */
+/**
+ * サプライズアイテムの在庫。7個から始まり、子どもたちの発送で減っていく
+ * ビンゴ ラウンド1でロビンが3個 → 4、ラウンド2で3個 → 1、ファイナルゲームの開始時にルドリーが1個 → 0
+ */
 export const SURPRISE_NAME = 'サプライズアイテム'
-export const SURPRISE_KID_ORDER = 3
+/** ステージ・ビンゴの進み具合から、子どもたちがここまでに発送したサプライズアイテムの数 */
+export function surpriseShipped(stage: number, lastStage: number, step: BingoStep | undefined): number {
+  if (stage >= lastStage) return 7
+  if (stage < 4) return 0
+  return step === 'r1' ? 3 : step === 'r2' || step === 'done' ? 6 : 0
+}
 
 /** 正しい注文か：3点が、決まった3つの商品（名前の前方一致）にちょうど1つずつ当たる */
 export function isBingoCart(step: BingoStep | undefined, items: OrderItem[], products: Product[]): boolean {

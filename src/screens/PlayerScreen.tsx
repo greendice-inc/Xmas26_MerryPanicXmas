@@ -646,6 +646,22 @@ export default function PlayerScreen({ team }: { team: number }) {
   }, [talking, markQuiz])
   // 「エルフに取り出し依頼」ボタン：ステージ4の ROUND1「とりよせのあと」の説明が始まってから出す。いちど出たら、そのあと（LAST まで）はずっと出す
   const bingoNow = doc.bingo ?? DEFAULT_BINGO
+  // ビンゴ ROUND1 の最初の正しい注文：届いたあとのエルフの説明は、必ず Santazon の画面でする。
+  // 注文してから説明が終わるまで、Santazon を閉じさせない（閉じていたら開き直す）
+  const holdShop =
+    doc.stage === BINGO_STAGE && doc.phase === 'game' && bingoNow.step === 'r1' && !bingoNow.deckIn && !!doc.order &&
+    (doc.order.status === 'ordered' || doc.order.status === 'delivered') && bingoNow.orderTold !== doc.order.at &&
+    isBingoCart(bingoNow.step, doc.order.items, products)
+  useEffect(() => {
+    if (!holdShop || shopOpen || talking || blackout) return
+    setSzTab('list')
+    setShopOpen(true)
+  }, [holdShop, shopOpen, talking, blackout])
+  // 「アイテムが届きました」を閉じたとき。ビンゴ ROUND1 の最初の注文は、暗くしてから（フェードで）エルフの説明を始める
+  const closeArrival = () => {
+    if (holdShop && doc.order?.status === 'delivered') fadeThen(() => setArrivedSeenAt(orderAt))
+    else setArrivedSeenAt(orderAt)
+  }
   const requestShown =
     doc.stage > BINGO_STAGE ||
     doc.phase === 'end' ||
@@ -665,6 +681,7 @@ export default function PlayerScreen({ team }: { team: number }) {
                 cart={cart}
                 setCart={(f) => setCart(f)}
                 onClose={() => setShopOpen(false)}
+                closeLocked={holdShop}
                 tab={szTab}
                 onTab={setSzTab}
                 searchUnlocked={!!doc.searchUnlocked || doc.stage > HIDE_STAGE}
@@ -683,7 +700,7 @@ export default function PlayerScreen({ team }: { team: number }) {
           {/* 最後は出さない。ステージ3のゲーム中（部屋のお題が出るまで）も、ゲーム画面を大きく見せるために出さない */}
           {doc.phase !== 'end' && !(doc.stage === WORD_STAGE && doc.phase === 'game' && (doc.word?.step ?? 'rule') !== 'room') && <GameMenu
             shopOpen={shopOpen}
-            locked={talking || (doc.stage === BINGO_STAGE && bingoLock)}
+            locked={talking || (doc.stage === BINGO_STAGE && (bingoLock || holdShop))}
             onOrder={
               !canOrder
                 ? undefined
@@ -698,7 +715,7 @@ export default function PlayerScreen({ team }: { team: number }) {
             guided={guideWait === 'shop' || (doc.phase === 'game' && doc.stage === HIDE_STAGE && (guide.menu || !!guide.sz))}
           />}
           {!talking && delivered && doc.order && arrivedSeenAt !== orderAt && !skipArrival && (
-            <ArrivalNotice onClose={() => setArrivedSeenAt(orderAt)} />
+            <ArrivalNotice onClose={closeArrival} />
           )}
           {!talking && delivered && doc.order && problemOpen && (
             <ProblemDialog
