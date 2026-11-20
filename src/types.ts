@@ -13,6 +13,10 @@ export function presenceKey(i: Identity): string {
 
 export interface PresenceDoc {
   lastSeen: number
+  /** 書いた端末の目印（deviceId）。同じ端末なら、起動中でも選び直せる */
+  device?: string
+  /** スタッフが「キック」した時刻。値が変わったら、その役割を開いている端末はトップ画面に戻る */
+  kickAt?: number
   /** この端末が、lastSeen の値が変わったのを見た時刻（保存はしない。時計のずれを避けるため） */
   seenAt?: number
 }

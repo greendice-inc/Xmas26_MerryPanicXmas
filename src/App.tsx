@@ -36,8 +36,8 @@ function debugPage(): Page | null {
   return null
 }
 
-function Session({ identity }: { identity: Identity }) {
-  usePresence(identity)
+function Session({ identity, onKicked }: { identity: Identity; onKicked: () => void }) {
+  usePresence(identity, onKicked)
   switch (identity.role) {
     case 'master':
       return <MasterScreen />
@@ -253,7 +253,7 @@ export default function App() {
     <Stage>
       {identity ? (
         <>
-          <Session key={connKey} identity={identity} />
+          <Session key={connKey} identity={identity} onKicked={() => setIdentity(null)} />
           {identity.role === 'player' ? (
             <PlayerHiddenMenu team={identity.id} onReset={() => setIdentity(null)} onReconnect={() => setConnKey((k) => k + 1)} />
           ) : (

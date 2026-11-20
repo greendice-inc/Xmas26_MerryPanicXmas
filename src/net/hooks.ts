@@ -2,15 +2,27 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { HEARTBEAT_MS, PRESENCE_TIMEOUT_MS, TEAM_COUNT } from '../config'
 import { DEFAULT_TEAM, presenceKey, type Identity, type PresenceDoc, type TeamDoc } from '../types'
 import { getBackend } from './index'
+import { deviceId } from '../deviceId'
 
-/** 自分の接続状況を定期的に書き込む */
-export function usePresence(identity: Identity) {
+/** 自分の接続状況を定期的に書き込む。スタッフにキックされたら onKicked を呼ぶ */
+export function usePresence(identity: Identity, onKicked?: () => void) {
+  const kickedRef = useRef(onKicked)
+  kickedRef.current = onKicked
+  // キック：開いたときに見えた kickAt を覚えておき、それから値が変わったら抜ける（端末どうしの時計のずれに左右されない）
+  useEffect(() => {
+    let base: number | undefined | null = null
+    return getBackend().watchDoc<PresenceDoc>('presence', presenceKey(identity), (d) => {
+      const k = d?.kickAt
+      if (base === null) base = k
+      else if (k !== base) kickedRef.current?.()
+    })
+  }, [identity.role, identity.id])
   useEffect(() => {
     // ?debug=true の開発中は、入室の信号を送らない（Firestore の書き込み回数を使わないため）
     if (new URLSearchParams(location.search).get('debug') === 'true') return
     const b = getBackend()
     const key = presenceKey(identity)
-    const beat = () => b.set('presence', key, { lastSeen: Date.now() }).catch(() => {})
+    const beat = () => b.set('presence', key, { lastSeen: Date.now(), device: deviceId() }).catch(() => {})
     beat()
     const t = setInterval(beat, HEARTBEAT_MS)
     const leave = () => b.set('presence', key, { lastSeen: 0 }).catch(() => {})

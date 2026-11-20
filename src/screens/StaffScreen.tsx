@@ -47,6 +47,7 @@ export default function StaffScreen() {
   const [kbSettings] = useKeyboxSettings()
   const boxRinging = !!keyboxes[String(boxId)]?.ringing
   const now = useNow()
+  const debug = new URLSearchParams(location.search).get('debug') === 'true'
   // マスターが生きていて、そのUSBアンテナがつながっているときだけ、キーボックスに指令が届く
   const masterOn = isOnline(presence['master'], now)
   const antennaOn = masterOn && !!keyboxes[LINK_ID]?.connected
@@ -144,6 +145,16 @@ export default function StaffScreen() {
                   >
                     次へ
                   </button>
+                  {/* この番号を開いている端末をトップ画面に戻す（切ったはずの端末が「起動中」のまま残ったとき用）。?debug=true のときだけ出す */}
+                  {debug && <TwoTapButton
+                    className="order-ready sub"
+                    disabled={!isOnline(presence[`player-${n}`], now)}
+                    onConfirm={() =>
+                      getBackend().set('presence', `player-${n}`, { kickAt: Date.now(), lastSeen: 0 }).catch(() => {})
+                    }
+                  >
+                    キック
+                  </TwoTapButton>}
                 </div>
               </div>
             </div>

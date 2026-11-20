@@ -1,5 +1,6 @@
 import { TEAM_COUNT } from '../config'
 import { isOnline, useNow, usePresenceAll } from '../net/hooks'
+import { deviceId } from '../deviceId'
 import { presenceKey, type Identity } from '../types'
 
 export default function TopScreen({
@@ -18,7 +19,11 @@ export default function TopScreen({
   // すでに別の端末で起動している役割には「起動中」の目印を出す
   const presence = usePresenceAll()
   const now = useNow()
-  const live = (i: Identity) => isOnline(presence[presenceKey(i)], now)
+  // この端末が使っていた役割は、起動中に見えても選び直せる（抜けたときの「切断」が届かず、しばらく起動中のまま残ることがあるため）
+  const live = (i: Identity) => {
+    const p = presence[presenceKey(i)]
+    return isOnline(p, now) && p?.device !== deviceId()
+  }
 
   const tile = (i: Identity, className: string, children: React.ReactNode, lockWhenOnline = false) => {
     const on = live(i)
