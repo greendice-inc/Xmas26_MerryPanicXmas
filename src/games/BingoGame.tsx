@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import GameTalk from '../components/GameTalk'
-import { Spotlight } from './Stage1Guide'
+import { Spotlight, SPOTS } from './Stage1Guide'
 import { useGameLines } from '../script/scriptData'
 import { sockKeyOfItems } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
@@ -164,8 +164,6 @@ interface Props {
   onFadeToGame: (then: () => void) => void
   /** ROUND2 が終わった。次のステージ（LAST）へ */
   onDone: () => void
-  /** ROUND1 の説明で、Santazon の「エルフに取り出し依頼」ボタンを光らせる */
-  onRequestGlow?: (on: boolean) => void
   /** ROUND1「とりよせのあと」の説明が始まった・終わった（「エルフに取り出し依頼」ボタンは、ここから出す） */
   onOrderTalk?: (on: boolean) => void
   /** エルフ・ロビンが話している間（チュートリアルの間も）は、下のボタンを押せなくする */
@@ -175,7 +173,7 @@ interface Props {
 }
 
 /** ステージ4：カタカナビンゴ。チュートリアル → ROUND1 → ROUND2 */
-export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone, onRequestGlow, onOrderTalk, onLock, arrived }: Props) {
+export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone, onOrderTalk, onLock, arrived }: Props) {
   const { products } = useProducts()
   const bingo: BingoProgress = { ...DEFAULT_BINGO, ...doc.bingo }
   const bingoRef = useRef(bingo)
@@ -312,12 +310,8 @@ export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone,
     return () => onOrderTalk?.(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderTalk])
-  const requestGlow = !!orderLine && orderLine.id === 'request'
-  useEffect(() => {
-    onRequestGlow?.(requestGlow)
-    return () => onRequestGlow?.(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestGlow])
+  // 「エルフに取り出し依頼」の行：Santazon のそのボタンにスポットライトを当てる
+  const requestSpot = !!orderLine && orderLine.id === 'request' && shopOpen
 
   // 取り出し依頼のあと：1行目（Santazon の上）→ フェードでゲーム画面へ → 2行目（山札に加えます）→ 山札に配る
   const [sockIdx, setSockIdx] = useState(0)
@@ -490,6 +484,9 @@ export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone,
       {/* ジャックの説明の行（jack）では、ボタンだけ明るく見せる */}
       {line?.id === 'jack' && overlay(<Spotlight rect={JACK_SPOT} pass={false} round />)}
 
+      {/* 「エルフに取り出し依頼」の行では、そのボタンだけ明るく見せる（周りを暗くする。枠は出さない） */}
+      {requestSpot && overlay(<Spotlight rect={SPOTS.szRequest} pass={false} ring={false} />)}
+
       {(line || orderLine || (solved && !talk)) &&
         overlay(
           <>
@@ -501,6 +498,8 @@ export default function BingoGame({ doc, update, shopOpen, onFadeToGame, onDone,
               // [番号] は、そのラウンドの宅配ソックスの番号
               line={line ?? orderLine ?? { ...(sockLine ?? elf('')), text: (sockLine?.text ?? '').replace(/\[番号\]/g, doc.order ? sockKeyOfItems(doc.order.items, products) : '') }}
               compact={shopOpen}
+              // ボタンを照らしている行は、全体を暗くしない（照らしたボタンまで暗くなる）
+              dim={!requestSpot}
               // ロビンの画面（ダイアログ）を開いているあいだは、ダイアログにかぶらないよう、画面の一番下で話す
               low={jackOpen}
             />

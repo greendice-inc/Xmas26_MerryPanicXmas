@@ -1680,7 +1680,6 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .sz-scroll-fade { position: absolute; left: 40px; width: 1250px; bottom: 0; height: 200px; z-index: 6; pointer-events: none; background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .92) 75%, #fff); }
 @keyframes sz-scroll-bob { from { transform: translateY(-10px); opacity: .7; } to { transform: translateY(8px); opacity: 1; } }
 
-.santazon .sz-side-btn.is-request.is-glow,
 .santazon .sz-side-btn.is-sock.is-glow { animation: guide-glow .7s ease-in-out infinite alternate; }
 
 /* ?debug=true：ソックスキーの答え（画面の上の真ん中に小さく） */

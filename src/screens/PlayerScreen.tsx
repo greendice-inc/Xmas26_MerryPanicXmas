@@ -113,7 +113,6 @@ export default function PlayerScreen({ team }: { team: number }) {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [recordsOpen, setRecordsOpen] = useState(false)
   // ステージ4 ROUND1 の説明で、取り出し依頼ボタンを光らせる
-  const [requestGlow, setRequestGlow] = useState(false)
   // ステージ4：ROUND1「とりよせのあと」の説明が始まったか（「エルフに取り出し依頼」ボタンは、ここから出す）
   const [bingoOrderTalk, setBingoOrderTalk] = useState(false)
   // ステージ4：エルフ・ロビンが話している間は、下のボタンを押せない
@@ -415,7 +414,6 @@ export default function PlayerScreen({ team }: { team: number }) {
               then()
             })
           }
-          onRequestGlow={setRequestGlow}
           onOrderTalk={setBingoOrderTalk}
           // 「アイテムが届きました」を閉じたあと、ROUND1 の取り出し依頼の説明が始まる
           arrived={arrivedSeenAt === (doc.order?.at ?? null)}
@@ -689,8 +687,8 @@ export default function PlayerScreen({ team }: { team: number }) {
                 onRequest={requestShown ? onRequest : undefined}
                 // 届いた注文のナゾ（閉じていても、ここから開き直せる）
                 onOpenProblem={openProblemOverShop}
-                sockGlow={sockGlow}
-                requestGlow={requestGlow}
+                // ビンゴ ROUND1 の取り出し依頼の説明中は、ソックスキーのボタンを光らせない（どちらのボタンの話か分からなくなる）。説明が終わってから光らせる
+                sockGlow={sockGlow && !bingoOrderTalk}
                 onConfirmedClose={onConfirmedClose}
                 guide={doc.phase === 'game' && doc.stage === HIDE_STAGE ? guide.sz : null}
               />

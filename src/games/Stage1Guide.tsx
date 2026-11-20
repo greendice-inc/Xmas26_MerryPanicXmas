@@ -25,6 +25,8 @@ export const SPOTS = {
   szOrder: { x: 1370, y: 660, w: 521, h: 261 },
   /** Santazon の「ソックスキーを導く」ボタン（styles.css の .santazon .sz-cart と .sz-side-btn：x=1370〜1891、y=935〜1046） */
   szSock: { x: 1370, y: 935, w: 521, h: 111 },
+  /** Santazon の「エルフに取り出し依頼」ボタン（ソックスキーのボタンの下。.sz-side-btn の margin-top 14px：y=1060〜1171） */
+  szRequest: { x: 1370, y: 1060, w: 521, h: 111 },
 } satisfies Record<string, Rect>
 
 /** 矢印で指す場所（矢印の先の点。1920×1200 の画面の座標）。矢印は上から下を指す */
@@ -66,7 +68,7 @@ export const SOCK_FX: Record<string, GuideFx> = {
 }
 
 /** 周りを暗くして、rect だけ明るく見せる。pass=true のときは、明るいところだけ触れる */
-export function Spotlight({ rect, pass, round }: { rect: Rect; pass: boolean; round?: boolean }) {
+export function Spotlight({ rect, pass, round, ring = true }: { rect: Rect; pass: boolean; round?: boolean; ring?: boolean }) {
   const { x, y, w, h } = rect
   const block = pass ? undefined : { pointerEvents: 'none' as const }
   return (
@@ -75,7 +77,7 @@ export function Spotlight({ rect, pass, round }: { rect: Rect; pass: boolean; ro
       <div className="spot-dim" style={{ left: 0, top: y + h, width: '100%', bottom: 0, ...block }} />
       <div className="spot-dim" style={{ left: 0, top: y, width: x, height: h, ...block }} />
       <div className="spot-dim" style={{ left: x + w, top: y, right: 0, height: h, ...block }} />
-      <div className="spot-ring" style={{ left: x - 8, top: y - 8, width: w + 16, height: h + 16, ...(round ? { borderRadius: '50%' } : undefined) }} />
+      {ring && <div className="spot-ring" style={{ left: x - 8, top: y - 8, width: w + 16, height: h + 16, ...(round ? { borderRadius: '50%' } : undefined) }} />}
     </>
   )
 }

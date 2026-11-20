@@ -44,8 +44,6 @@ interface Props {
   closeLocked?: boolean
   /** 「注文が確定しました」を閉じたとき */
   onConfirmedClose?: () => void
-  /** 取り出し依頼ボタンを光らせる（ステージ4 ROUND1 の説明） */
-  requestGlow?: boolean
   /** 届いたあと、ナゾを開くまで「ソックスキーを導く」ボタンを光らせる */
   sockGlow?: boolean
 }
@@ -99,7 +97,7 @@ function ProductImage({ p }: { p: Product }) {
 }
 
 /** 注文画面「Santazon」。見た目はネット通販サイト風 */
-export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem, onConfirmedClose, sockGlow, requestGlow, closeLocked }: Props) {
+export default function Santazon({ doc, update, cart, setCart, onClose, tab: tabProp, onTab, searchUnlocked = true, guide, onBeforeOrder, onRequest, onOpenProblem, onConfirmedClose, sockGlow, closeLocked }: Props) {
   const { products } = useProducts()
   const productById = (id: string) => products.find((p) => p.id === id)
   const [ownTab, setOwnTab] = useState<SzTab>('list')
@@ -412,7 +410,7 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
               <img src={SZ.sockKey} alt="" draggable={false} />
             </button>
             {onRequest && (
-              <button className={`sz-side-btn is-request${requestGlow ? ' is-glow' : ''}`} disabled={requestOff} onClick={() => setRequesting(true)} aria-label="エルフに取り出し依頼">
+              <button className="sz-side-btn is-request" disabled={requestOff} onClick={() => setRequesting(true)} aria-label="エルフに取り出し依頼">
                 <img src={SZ.request} alt="" draggable={false} />
               </button>
             )}
