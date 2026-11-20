@@ -119,8 +119,8 @@ export const ST2_KIDS = {
 /** ステージ2：ゲーム画面。found は見つけた人数（0〜3） */
 export const st2GameImage = (found: number) => `${BASE}BG/Stage2/st2_ゲーム画面_${Math.min(4, found + 1)}.png`
 
-/** ダミー（マネキン）の画像。専用の画像ができるまでは商品カードを使う */
-export const MANNEQUIN_IMAGE = `${BASE}slide/st2/card.png`
+/** ステージ2：マネキンとセーターの商品カード。画面に出す用（記録には RECORDS['st2-card'] の別画像を載せる） */
+export const ST2_CARD_IMAGE = `${BASE}BG/Stage2/2nd_card1.webp`
 
 /** 「記録」から見返せる画像。stage は、どのステージのタブに載せるか */
 export const RECORDS: Record<string, { stage: number; title: string; image: string }> = {
@@ -128,7 +128,7 @@ export const RECORDS: Record<string, { stage: number; title: string; image: stri
   'st1-mood': { stage: 1, title: 'リンのキモチ', image: '' },
   // ステージ1 マークのルール（中身は RecordsPage で作る。画像なし）
   'st1-rule': { stage: 1, title: 'リングデマーク', image: '' },
-  'st2-card': { stage: 2, title: 'マネキンとセーターの商品カード', image: `${BASE}slide/st2/card.png` },
+  'st2-card': { stage: 2, title: 'マネキンとセーターの商品カード', image: `${BASE}BG/Stage2/2nd_card2.webp` },
   // ステージ4 ROUND1 で発送したアイテムとソックスキー（中身はゲーム画面で作る。画像なし）
   'st4-r1': { stage: 4, title: 'ROUND1で発送したアイテムとソックスキー', image: '' },
   // 子どものキモチ（見出しと中身は PlayerScreen で、各ステージの Mood から作る）
@@ -189,8 +189,8 @@ const STAGE2_INTRO: NovelScene = {
     sil('アミー', 'オレ達きょうだいと遊ぶゲームは……'),
     sil(ST2_KIDS_NAME, '『かくれんトリオ』！', '喜'),
     sil('トミー', 'ボクたち三兄弟といっしょにかくれんぼで遊ぼうよ！'),
-    sil('トミー', 'さっきsantazonを使って、こんなものを取り寄せたんだ！', '楽', { slide: RECORDS['st2-card'].image }),
-    sil('トミー', 'このアイテムで生み出した、新たな仲間{「ダミー」}も加えた\nボクたち4人が隠れるから、大人の2人で見つけ出してね！', '喜'),
+    sil('トミー', 'さっきsantazonを使って、こんなものを取り寄せたんだ！', '楽', { id: 'st2-card', slide: ST2_CARD_IMAGE }),
+    sil('トミー', 'このアイテムで生み出した、新たな仲間{「ダミー」}も加えた\nボクたち4人が隠れるから、大人の2人で見つけ出してね！', '喜', { id: 'st2-card-2', slide: ST2_CARD_IMAGE }),
     elf2('このゲームでは、子ども部屋がエルフの準備した\n「かくれんぼフィールド」に変化しています。'),
     elf2('そして、ここに{アミー}、{ジミー}、{トミー}、そして{ダミー}の\n4人がこのかくれんぼフィールドに隠れます。'),
     elf2('ゲームは3ラウンド。1ラウンドごとに、\n大人は隠れ場所を1か所指定してください。'),

@@ -5,6 +5,8 @@ import MoodCard from './MoodCard'
 const CHAR_MS = 50
 /** 登場演出（キャラが下からせり上がる → パネルが出る）の長さ。この後に台詞が出始める */
 const INTRO_MS = 1500
+/** 画像を画面のど真ん中に出し、キャラクターの絵と名前のバッジを出さない行（行の名前で指す） */
+const CENTER_SLIDE_LINES = new Set(['st2-card', 'st2-card-2'])
 
 /** 「{強調}」の部分を黄色にするため、文字列を分割する */
 function parse(text: string): { t: string; hl: boolean }[] {
@@ -182,7 +184,9 @@ export default function NovelPart({
   })
 
   const happy = line.emotion === '喜' || line.emotion === '楽'
-  const prevSlide = idx > 0 ? scene.lines[idx - 1]?.slide : undefined
+  const prev = idx > 0 ? scene.lines[idx - 1] : undefined
+  const prevSlide = prev?.slide
+  const centered = CENTER_SLIDE_LINES.has(line.id ?? '')
 
   return (
     <div className={`novel${skip ? ' skip' : ''}`} style={{ ['--lead' as string]: `${leadMs}ms` }} onClick={next}>
@@ -202,7 +206,7 @@ export default function NovelPart({
           【{line.banner}】
           {ready && <div className="next">▼</div>}
         </div>
-      ) : (
+      ) : centered ? null : (
       <CharSlot
         pos="center"
         folder={character}
@@ -216,14 +220,14 @@ export default function NovelPart({
       )}
 
       {line.slide ? (
-        <img key={`slide${idx}`} className="novel-slide" src={line.slide} alt="" />
+        <img key={`slide:${line.slide}`} className={`novel-slide${centered ? ' is-center' : ''}`} src={line.slide} alt="" />
       ) : (
         // 前の台詞で出ていた画像は、フェードで消す
-        prevSlide && <img key={`out${idx}`} className="novel-slide is-out" src={prevSlide} alt="" />
+        prevSlide && <img key={`out${idx}`} className={`novel-slide is-out${CENTER_SLIDE_LINES.has(prev?.id ?? '') ? ' is-center' : ''}`} src={prevSlide} alt="" />
       )}
 
       {!line.banner && !line.mood && <div className="novel-panel">
-        <div className="novel-speaker">{line.speaker}</div>
+        {!centered && <div className="novel-speaker">{line.speaker}</div>}
         <div className={`novel-text size-${line.size ?? 'md'}`}>
           {line.image && <img className="novel-panel-img" src={line.image} alt="" />}
           <div className="text">{typed}</div>

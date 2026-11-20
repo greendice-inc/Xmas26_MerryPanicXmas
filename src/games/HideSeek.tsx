@@ -6,7 +6,7 @@ import { useProducts } from '../santazon/useProducts'
 import GameTalk, { hl } from '../components/GameTalk'
 import { SPOTS, Spotlight } from './Stage1Guide'
 import { lineImage } from '../script/gameScenes'
-import { RECORDS, ST2_KIDS, st2GameImage, type NovelLine } from '../scenario'
+import { ST2_CARD_IMAGE, ST2_KIDS, st2GameImage, type NovelLine } from '../scenario'
 import { lineIndex, useGameLines } from '../script/scriptData'
 import type { HideProgress, TeamDoc } from '../types'
 import { GuideArrow } from './Stage1Guide'
@@ -329,7 +329,7 @@ export default function HideSeek({ doc, update, shopOpen, szTab, onGuide, onAllF
             {/* 「リスト登録」タブ（x=1360〜1880、y=20〜140）だけ明るくして、下から指す */}
             {line.wait === 'tab' && !talkHeld && <Spotlight rect={{ x: 1360, y: 20, w: 520, h: 120 }} pass />}
             {line.wait === 'tab' && !talkHeld && <GuideArrow key="tab-arrow" x={1620} y={146} up />}
-            {line.card && <img key={line.card} className="hide-card" src={RECORDS[CARD_ID].image} alt="" />}
+            {line.card && <img key={line.card} className="hide-card" src={ST2_CARD_IMAGE} alt="" />}
             {line.wait === 'search' ? (
               // 検索してもらう行は、しゃべらせず、右上にダイアログだけ出しておく
               <div className="hide-search-dialog">{hl(line.talk.text)}</div>
