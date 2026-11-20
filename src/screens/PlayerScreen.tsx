@@ -151,8 +151,6 @@ export default function PlayerScreen({ team }: { team: number }) {
   // 「アイテムが届きました」を閉じた注文（の時刻）と、ソックスキーのナゾを開いているか
   const [arrivedSeenAt, setArrivedSeenAt] = useState<number | null>(null)
   const [problemOpen, setProblemOpen] = useState(false)
-  // 「アイテムが届きました」のあと、ソックスキーを導くボタンを1回押すまで光らせる（押した注文の時刻）
-  const [sockPressedAt, setSockPressedAt] = useState<number | null>(null)
   // ステージ1の案内で、プレイヤーの操作を待っているもの
   const [guideWait, setGuideWait] = useState<GuideFx['wait'] | null>(null)
   // 正解直後、Firestore の反映を待たずにエルフを出すための時刻
@@ -589,14 +587,12 @@ export default function PlayerScreen({ team }: { team: number }) {
     if (!delivered) return
     setShopOpen(false)
     setArrivedSeenAt(orderAt)
-    setSockPressedAt(orderAt)
     setProblemOpen(true)
   }
   // Santazon の中から押したときは、Santazon を閉じず、その上にナゾを重ねて開く（ゲーム画面に切り替えない）
   const openProblemOverShop = () => {
     if (!delivered) return
     setArrivedSeenAt(orderAt)
-    setSockPressedAt(orderAt)
     setProblemOpen(true)
   }
   // ステージ1：マークが分かったあとの説明（マークの画面のまま）
@@ -631,8 +627,9 @@ export default function PlayerScreen({ team }: { team: number }) {
       setShopOpen(true)
     } else openProblem()
   }
-  // 「アイテムが届きました」のあと、ナゾを開くまで：Santazon のボタン（と、それを開く下のボタン）を光らせる
-  const sockGlow = doc.stage >= 2 && !markQuiz && delivered && arrivedSeenAt === orderAt && sockPressedAt !== orderAt
+  // 「アイテムが届きました」のあと、ナゾを解くまで：Santazon のボタン（と、それを開く下のボタン）を光らせる。
+  // 一度開いても、解いていなければ光らせたままにする（解くと注文が solved になり、delivered でなくなるので消える）
+  const sockGlow = doc.stage >= 2 && !markQuiz && delivered && arrivedSeenAt === orderAt
   // 会話中に開いたままの画面は閉じる。テキストを送る以外の操作を残さない
   useEffect(() => {
     if (!talking && !markQuiz) return

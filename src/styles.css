@@ -1601,6 +1601,7 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .mark-game { padding-bottom: 170px; }
 
 /* やるべきこと：やること と、子どものキモチ（ハートの代わり） */
+.modal.task-modal { animation: slide-up-far .45s cubic-bezier(.2, .9, .3, 1) backwards; }
 .modal.task-modal { max-width: 1500px; background: #ffe9ea; box-shadow: inset 0 0 0 6px #e8525d, 0 20px 60px rgba(0, 0, 0, 0.3); }
 .modal.task-modal h2 { font-size: 64px; color: #d62839; }
 .task-mood { display: flex; align-items: center; gap: 28px; padding: 8px 10px; }
@@ -1891,3 +1892,10 @@ button.extra-back { position: absolute; right: 30px; top: 30px; z-index: 6; font
 .mark-cell.is-selected { background: #eaf4fd; box-shadow: inset 0 0 0 5px #1485e0; }
 .mark-cell.is-selected .mark-input { background: #fff; border-bottom-color: #1485e0; }
 .mark-cell:active .mark-img { transform: translateY(4px); }
+
+/* Santazon・記録・やるべきことは、開いたときに画面の下からにゅーっとせりあがってくる。
+   終わったあとまで transform を残さない（backwards）。残すと、中の重なりや位置の測り方が変わる */
+.santazon, .records-page { animation: slide-up .45s cubic-bezier(.2, .9, .3, 1) backwards; }
+@keyframes slide-up { from { transform: translateY(100%); } to { transform: none; } }
+/* 真ん中に出る箱は、画面（高さ1200）の下の外から上げる */
+@keyframes slide-up-far { from { transform: translateY(1200px); } to { transform: none; } }
