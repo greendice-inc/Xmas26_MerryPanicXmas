@@ -53,6 +53,8 @@ export interface ScriptLine {
   voice?: string
   /** 音声が鳴り終わったら、タップを待たずに次の台詞へ（フルボイス用） */
   auto?: boolean
+  /** 前の台詞の音声を止めずに流したまま、この台詞を出す（長台詞の音声を何行かに分けて見せるとき） */
+  keepVoice?: boolean
   /** 台詞と一緒に中央へ出す画像。public のパスか「image:<id>」 */
   slide?: string
   image?: string
@@ -213,6 +215,7 @@ export function linesFromScene(scene: NovelScene): ScriptLine[] {
       slide: l.slide,
       image: l.image,
       auto: l.auto,
+      keepVoice: l.keepVoice,
     }
   })
 }
@@ -357,6 +360,7 @@ export function toNovelScene(def: SceneDef, lines: ScriptLine[], chars: ScriptCh
         charSrc: charImage(c, l.emotion),
         image: l.image,
         auto: l.auto,
+        keepVoice: l.keepVoice,
         ...extra,
       }
     }),

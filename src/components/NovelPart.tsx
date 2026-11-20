@@ -99,6 +99,8 @@ export default function NovelPart({
   }, [idx])
 
   // 台詞が出たら効果音・音声を鳴らす。次の台詞に進んだら音声は止める
+  // （次の台詞が「前の音声を流したまま」なら止めない。長台詞の音声を何行かに分けて見せるとき）
+  const voiceRef = useRef<HTMLAudioElement | null>(null)
   useEffect(() => {
     if (!ready) return
     const play = (src?: string) => {
@@ -108,16 +110,20 @@ export default function NovelPart({
       return a
     }
     play(line.se)
+    if (line.voice || !line.keepVoice) {
+      voiceRef.current?.pause()
+      voiceRef.current = null
+    }
     const voice = play(line.voice)
+    if (voice) voiceRef.current = voice
     // フルボイスの台詞（auto）：音声が鳴り終わったら、タップを待たずに次へ。音声が無い台詞は、タップで進む
     const onEnded = () => advanceRef.current()
     if (line.auto && voice) voice.addEventListener('ended', onEnded)
-    return () => {
-      voice?.removeEventListener('ended', onEnded)
-      voice?.pause()
-    }
+    return () => voice?.removeEventListener('ended', onEnded)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, ready])
+  // 会話が終わったら（画面を離れたら）音声を止める
+  useEffect(() => () => voiceRef.current?.pause(), [])
   const segs = parse(line.text)
   const total = segs.reduce((n, s) => n + s.t.length, 0)
   const talking = ready && shown < total

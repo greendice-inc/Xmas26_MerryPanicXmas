@@ -586,6 +586,12 @@ function LineRow({
             <input type="checkbox" checked={!!line.auto} onChange={(e) => onEdit({ auto: e.target.checked || undefined })} />
             音声が終わったら自動で次へ
           </label>
+          {!def.game && (
+            <label className="script-pos" title="前の台詞の音声を止めずに、流したままこの台詞を出します（長台詞の音声を何行かに分けて見せるとき。画面はタップで進みます）">
+              <input type="checkbox" checked={!!line.keepVoice} onChange={(e) => onEdit({ keepVoice: e.target.checked || undefined })} />
+              前の音声を流したまま
+            </label>
+          )}
           <ImageField value={line.slide} images={images} onChange={(v) => onEdit({ slide: v })} onUpload={onUploadImage} />
         </div>
       </div>

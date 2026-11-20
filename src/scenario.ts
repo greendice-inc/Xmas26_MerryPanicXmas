@@ -34,6 +34,8 @@ export interface NovelLine {
   voice?: string
   /** 音声（voice）が鳴り終わったら、タップを待たずに次の台詞へ進む（フルボイスの台詞用。音声が無い台詞は、タップで進む） */
   auto?: boolean
+  /** 前の台詞の音声を止めずに流したまま、この台詞を出す（長台詞の音声を何行かに分けて見せるとき。タップで進む） */
+  keepVoice?: boolean
   /** ゲーム画面の会話の位置（bottom=下のボタンのすぐ上 / top=画面の上 / shop=Santazon を開いている間の左下） */
   pos?: 'bottom' | 'top' | 'shop' | 'corner'
 }
