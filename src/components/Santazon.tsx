@@ -360,6 +360,7 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
             {rows.map((p) => {
               const left = remaining(p)
               const soldOut = left <= 0
+              const takeOut = soldOut && cart.some((i) => i.id === p.id)
               const surprise = p.name === SURPRISE_NAME
               return (
                 <div
@@ -378,7 +379,13 @@ export default function Santazon({ doc, update, cart, setCart, onClose, tab: tab
                       <img src={SZ.detail} alt="" draggable={false} />
                     </button>
                   )}
-                  <button className="sz-item-btn is-cart" aria-label="カートに追加" disabled={soldOut || full || ordering} onClick={() => add(p)}>
+                  {/* 在庫が0でも、カートに入っている商品なら、押すとカートから1つ外す */}
+                  <button
+                    className="sz-item-btn is-cart"
+                    aria-label={takeOut ? 'カートから外す' : 'カートに追加'}
+                    disabled={ordering || (!takeOut && (soldOut || full))}
+                    onClick={() => (takeOut ? dec(p.id) : add(p))}
+                  >
                     <img src={SZ.addCart} alt="" draggable={false} />
                   </button>
                   <div className="sz-item-stock">
