@@ -125,7 +125,7 @@ export const st2GameImage = (found: number) => `${BASE}BG/Stage2/st2_ゲーム�
 export const ST2_CARD_IMAGE = `${BASE}BG/Stage2/2nd_card1.webp`
 
 /** 「記録」から見返せる画像。stage は、どのステージのタブに載せるか */
-export const RECORDS: Record<string, { stage: number; title: string; image: string }> = {
+export const RECORDS: Record<string, { stage: number; title: string; image: string; video?: string }> = {
   // ステージ1 マークのリンのキモチ（中身は ST1_MOOD。画像なし）
   'st1-mood': { stage: 1, title: 'リンのキモチ', image: '' },
   // ステージ1 マークのルール（中身は RecordsPage で作る。画像なし）
@@ -143,7 +143,8 @@ export const RECORDS: Record<string, { stage: number; title: string; image: stri
   'st2-sum': { stage: 2, title: 'まとめ', image: '' },
   'st3-sum': { stage: 3, title: 'まとめ', image: '' },
   'st4-sum': { stage: 4, title: 'まとめ', image: '' },
-  'st5-sum': { stage: 5, title: 'まとめ', image: '' },
+  // LAST のまとめは、文の下に動画（3段のエントツにボールを入れたところ）も出す
+  'st5-sum': { stage: 5, title: 'まとめ', image: '', video: `${BASE}BG/StageF/stF_record.mp4` },
 }
 
 /** ステージ2：三人のキモチ。誰がどの名前かはわからないので、アイコンはシルエットのまま */

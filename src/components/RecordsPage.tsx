@@ -143,6 +143,10 @@ export default function RecordsPage({
               ) : (
                 <img src={RECORDS[id].image} alt="" />
               )}
+              {RECORDS[id].video && (
+                // 再生ボタンなどはブラウザの標準のものを使う。音は出るが、勝手には再生しない
+                <video className="records-video" src={RECORDS[id].video} controls playsInline preload="metadata" />
+              )}
             </figure>
           ),
         )}
