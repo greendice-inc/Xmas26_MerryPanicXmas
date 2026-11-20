@@ -8,7 +8,7 @@ import { isOnline, useNow, usePresenceAll, useTeamsAll } from '../net/hooks'
 import { toHex2 } from '../keybox/protocol'
 import { useKeyboxSettings } from '../keybox/settings'
 import { LINK_ID, requestKeyboxLock, requestKeyboxUnlock, setKeyboxRinging, useKeyboxAll, useKeyboxSendFailed } from '../net/keybox'
-import { isGame1LoseCart, ORDER_STAGES } from '../santazon/products'
+import { ORDER_STAGES } from '../santazon/products'
 import { useProducts } from '../santazon/useProducts'
 import { SCENE_NODES, sceneIndex } from '../sceneProgress'
 import { DEFAULT_TEAM, type TeamDoc } from '../types'
@@ -103,8 +103,7 @@ export default function StaffScreen() {
             ORDER_STAGES.includes(t.stage) &&
             !!order &&
             order.status === 'solved' &&
-            order.proceedAt == null &&
-            !(t.stage === 1 && isGame1LoseCart(order.items))
+            order.proceedAt == null
           return (
             <div className={`staff-row ${t.locked ? 'is-locked' : 'is-open'}`} key={n}>
               <div className="staff-row-body">
