@@ -488,6 +488,9 @@ button.armed { animation: armed-pulse .6s ease-in-out infinite alternate; }
 .sz-search-hint {
   margin: 0; width: 100%; max-width: 1480px; text-align: center;
   font-size: 28px; font-weight: 900; line-height: 1.55; color: #ff9900;
+  /* 中の文字（.sz-hint-ch）は inline なので touch-action が効かない。外側のこの段落で止めないと、
+     タブレットで引っ張る途中にスクロール扱いになって pointercancel が来て、途中で落ちる */
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sz-hint-line { display: inline; }
 .santazon button.sz-hint-ch {
